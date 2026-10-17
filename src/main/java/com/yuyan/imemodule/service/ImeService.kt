@@ -109,6 +109,7 @@ class ImeService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        KeyboardManager.instance.release()   // 新增，放在最前面
         super.onDestroy()
         DictDecoder.candidatesLiveData.removeObserver(candidatesObserver)
         getInstance().keyboardSetting.showVirtualKeyboardOnPhysicalKeyboard.unregisterOnChangeListener(showVirtualKeyboardOnPhysicalKeyboardListener)

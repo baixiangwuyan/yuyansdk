@@ -1,5 +1,6 @@
 package com.yuyan.imemodule.keyboard
 
+import android.view.ViewGroup
 import com.yuyan.imemodule.application.Launcher
 import com.yuyan.imemodule.manager.InputModeSwitcher
 import com.yuyan.imemodule.keyboard.container.BaseContainer
@@ -29,8 +30,17 @@ class KeyboardManager {
         private set
 
     fun setData(keyboardRootView: InputViewParent, inputView: InputView) {
+        // InputView 换了（切换输入法后 Service 重建），旧容器全部作废
+        val changed = !::mInputView.isInitialized || mInputView !== inputView
         mKeyboardRootView = keyboardRootView
         mInputView = inputView
+        if (changed) release()
+    }
+
+    fun release() {
+        keyboards.values.forEach { c -> (c?.parent as? ViewGroup)?.removeView(c) }
+        keyboards.clear()
+        currentContainer = null
     }
 
     fun clearKeyboard() {
