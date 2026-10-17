@@ -309,12 +309,12 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         mPaint.color = textColor
         mPaint.style = Paint.Style.FILL
         mPaint.typeface = if (keyboardFontBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-        mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.75f   // 名称字号
+        mPaint.textSize = mNormalKeyTextSize.toFloat()            // 和“换行”一样大
         val fm = mPaint.fontMetrics
         val textH = fm.descent - fm.ascent
-        val gap = 6f * density                                     // 名称与空格符间距
-        val symW = min(softKey.width() * 0.30f, 40f * density)     // 空格符宽
-        val symH = 5f * density                                    // 空格符高
+        val gap = 5f * density                                     // 名称与空格符间距
+        val symW = min(softKey.width() * 0.18f, 24f * density)     // 空格符宽
+        val symH = 3.5f * density                                  // 空格符高
         // 名称+间距+空格符 整体垂直居中
         val top = softKey.mTop + (softKey.height() - (textH + gap + symH)) / 2f
         val cx = softKey.mLeft + softKey.width() / 2f
@@ -326,7 +326,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         spacePath.lineTo(cx + symW / 2f, symTop + symH)
         spacePath.lineTo(cx + symW / 2f, symTop)
         mPaint.style = Paint.Style.STROKE
-        mPaint.strokeWidth = 1.6f * density
+        mPaint.strokeWidth = 1.3f * density
         mPaint.strokeCap = Paint.Cap.ROUND
         mPaint.strokeJoin = Paint.Join.ROUND
         mPaint.alpha = 160

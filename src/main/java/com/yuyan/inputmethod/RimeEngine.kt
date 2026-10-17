@@ -260,8 +260,9 @@ object RimeEngine {
 
     private fun applyTypedCase(text: String): String {
         val raw = typedCase.toString()
-        if (text.isEmpty() || raw.isEmpty() || raw.none { it.isUpperCase() }) return text
-        if (text.equals(raw, ignoreCase = true)) return raw          // aaaaA 原样
+        if (text.isEmpty() || raw.isEmpty()) return text
+        if (text.equals(raw, ignoreCase = true)) return raw          // 和敏的字母一样：完全按敏的大小写
+        if (raw.none { it.isUpperCase() }) return text               // 没按 Shift：其他候选保持词库原样
         return when {
             raw.length > 1 && raw.all { it.isUpperCase() } -> text.uppercase()   // 全大写
             raw.first().isUpperCase() -> text.replaceFirstChar { it.titlecase(Locale.getDefault()) }
