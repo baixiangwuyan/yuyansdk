@@ -84,8 +84,12 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         var softKey = mSoftKeyboard?.getKeyByCode(KeyEvent.KEYCODE_ENTER) as? SoftKeyToggle
         softKey?.enableToggleState( if(mService!!.isAddPhrases)4 else InputModeSwitcher.mToggleStates.imeAction)
         softKey = mSoftKeyboard?.getKeyByCode(KeyEvent.KEYCODE_SHIFT_LEFT) as? SoftKeyToggle
-        val isEnglishCell = AppPrefs.getInstance().input.abcSearchEnglishCell.getValue()
-        softKey?.enableToggleState(InputModeSwitcher.mToggleStates.modifiers + if(isEnglishCell) 3 else 0)
+        val shiftState = when (InputModeSwitcher.mToggleStates.modifiers) {
+            KeyEvent.META_CAPS_LOCK_ON -> 2   // 全蓝：大写锁定（双击）
+            KeyEvent.META_SHIFT_ON -> 1       // 蓝轮廓：大写一个后回小写
+            else -> 0                         // 灰：小写
+        }
+        softKey?.enableToggleState(shiftState)
         invalidateView()
     }
 
@@ -245,7 +249,11 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             val marginRight = softKey.width() - intrinsicWidth - marginLeft
             val marginTop = (softKey.height() - intrinsicHeight) / 2
             val marginBottom = softKey.height() - intrinsicHeight - marginTop
-            keyIcon.setTint(mActiveTheme.keyTextColor)
+            if (softKey.code == KeyEvent.KEYCODE_SHIFT_LEFT) {
+                keyIcon.setTintList(null)   // 花花图保留原色，不染色
+            } else {
+                keyIcon.setTint(mActiveTheme.keyTextColor)
+            }
             keyIcon.setBounds(softKey.mLeft + marginLeft, softKey.mTop + marginTop, softKey.mRight - marginRight, softKey.mBottom - marginBottom)
             keyIcon.draw(canvas)
         } else if (softKey.code == KeyEvent.KEYCODE_SPACE && !TextUtils.isEmpty(keyLabel) &&
