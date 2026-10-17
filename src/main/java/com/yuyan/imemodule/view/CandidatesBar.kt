@@ -62,6 +62,8 @@ class CandidatesBar(context: Context?, attrs: AttributeSet?) : RelativeLayout(co
     private lateinit var mCandidatesMenuAdapter: CandidatesMenuAdapter
     private lateinit var candidatesData: LinearLayout //候选词视图
     private var activeCandNo:Int = 0
+    private var mMenuIconColor: Int? = null
+    private var mMenuShowFlower = true
 
     fun initialize(cvListener: CandidateViewListener) {
         mCvListener = cvListener
@@ -153,7 +155,7 @@ class CandidatesBar(context: Context?, attrs: AttributeSet?) : RelativeLayout(co
                 gravity = Gravity.CENTER_VERTICAL
             }
             mIvMenuSetting = ImageView(context).apply {
-                setImageResource(R.drawable.sdk_level_candidates_menu_left)
+                setImageResource(R.drawable.huahua_menu_flower)
                 isClickable = true
                 isEnabled = true
                 setOnClickListener { mCvListener.onClickMenu(SkbMenuMode.SettingsMenu) }
@@ -275,7 +277,7 @@ class CandidatesBar(context: Context?, attrs: AttributeSet?) : RelativeLayout(co
     fun showCandidates() {
         mComposingView.text = DictDecoder.composingStrForDisplay
         val container = KeyboardManager.instance.currentContainer
-        mIvMenuSetting.drawable.setLevel( if(container is InputBaseContainer) 0 else 1)
+        setMenuIcon(container is InputBaseContainer)
         if (container is ClipBoardContainer) {
             showViewVisibility(mCandidatesMenuContainer)
             mCandidatesMenuAdapter.items = if(container.getMenuMode() == SkbMenuMode.ClipBoard) {
@@ -381,15 +383,27 @@ class CandidatesBar(context: Context?, attrs: AttributeSet?) : RelativeLayout(co
         }
     }
 
+    // 左上角图标：输入时显示花花（保持原色，不着色），其他面板显示返回箭头（跟随主题色）
+    private fun setMenuIcon(showFlower: Boolean, force: Boolean = false) {
+        if (!::mIvMenuSetting.isInitialized || (!force && showFlower == mMenuShowFlower)) return
+        mMenuShowFlower = showFlower
+        if (showFlower) {
+            mIvMenuSetting.setImageResource(R.drawable.huahua_menu_flower)
+        } else {
+            mIvMenuSetting.setImageResource(R.drawable.ic_menu_arrow_up)
+            mMenuIconColor?.let { mIvMenuSetting.drawable.mutate().setTint(it) }
+        }
+    }
+
     // 刷新主题
     fun updateTheme(textColor: Int) {
         initMenuView()
         initCandidateView()
-        mIvMenuSetting.setImageResource(R.drawable.sdk_level_candidates_menu_left)
         mComposingView.setTextColor(textColor)
         mRightArrowBtn.drawable.setTint(textColor)
         mMenuRightArrowBtn.drawable.setTint(textColor)
-        mIvMenuSetting.drawable.setTint(textColor)
+        mMenuIconColor = textColor
+        setMenuIcon(mMenuShowFlower, force = true)
         mCandidatesAdapter.notifyChanged()
         mCandidatesMenuAdapter.notifyChanged()
         mFlowerType.setTextColor(textColor)
