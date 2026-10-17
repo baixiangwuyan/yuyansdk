@@ -317,7 +317,9 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         val baseline = (softKey.mTop + softKey.mBottom) / 2.0f + (mFmi.bottom - mFmi.top)
         canvas.drawText(name, cx - mPaint.measureText(name) / 2f, baseline, mPaint)
         // 空格符：在文字下方，空出一个符号高度；防止超出按键底边
-        val symTop = min(baseline + symH, softKey.mBottom - symH - 2f * density)
+        val descent = mPaint.fontMetrics.descent                   // 汉字在基线下还有一截
+        val gap = 5f * density                                     // 文字底到符号顶的空隙，想再松就改大
+        val symTop = min(baseline + descent + gap, softKey.mBottom - symH - 2f * density)
         spacePath.reset()
         spacePath.moveTo(cx - symW / 2f, symTop)
         spacePath.lineTo(cx - symW / 2f, symTop + symH)
