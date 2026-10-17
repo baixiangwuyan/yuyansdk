@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withSave
 import com.yuyan.imemodule.R
+import com.yuyan.imemodule.application.CustomConstant
 import com.yuyan.imemodule.application.Launcher
 import com.yuyan.imemodule.prefs.behavior.SkbStyleMode
 import com.yuyan.imemodule.service.InputDispatcher
@@ -239,8 +240,10 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             val y = softKey.mTop + weightHeigth * 1.1f
             canvas.drawText(keyLabelSmall, x, y, mPaint)
         }
-        if (null != keyIcon && !(softKey.code == KeyEvent.KEYCODE_SPACE && !TextUtils.isEmpty(keyLabel) &&
-            (keyLabel.contains("拼音9键") || keyLabel.contains("拼音全键")))) {
+        val imeName = if (softKey.code == KeyEvent.KEYCODE_SPACE) spaceImeName() else null
+        if (imeName != null) {
+            drawSpaceWithName(canvas, softKey, imeName, textColor)
+        } else if (null != keyIcon) {
             var  intrinsicWidth = keyIcon.intrinsicWidth
             var  intrinsicHeight = keyIcon.intrinsicHeight
             while(softKey.width() < intrinsicWidth || softKey.height() < intrinsicHeight){
@@ -252,36 +255,12 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             val marginTop = (softKey.height() - intrinsicHeight) / 2
             val marginBottom = softKey.height() - intrinsicHeight - marginTop
             if (softKey.code == KeyEvent.KEYCODE_SHIFT_LEFT) {
-                keyIcon.setTintList(null)   // 花花图保留原色，不染色
+                keyIcon.setTintList(null)   // 花花图保留原色
             } else {
                 keyIcon.setTint(mActiveTheme.keyTextColor)
             }
             keyIcon.setBounds(softKey.mLeft + marginLeft, softKey.mTop + marginTop, softKey.mRight - marginRight, softKey.mBottom - marginBottom)
             keyIcon.draw(canvas)
-        } else if (softKey.code == KeyEvent.KEYCODE_SPACE && !TextUtils.isEmpty(keyLabel) &&
-            (keyLabel.contains("拼音9键") || keyLabel.contains("拼音全键"))) {
-            // 空格键：文字在上（输入法名称），原版符号在下（下移）
-            mPaint.color = textColor
-            if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
-            val fontHeight = mFmi.bottom - mFmi.top
-            mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.85f
-            val x1 = softKey.mLeft + (softKey.width() - mPaint.measureText(keyLabel)) / 2.0f
-            val y1 = softKey.mTop + softKey.height() * 0.32f + fontHeight * 0.5f
-            canvas.drawText(keyLabel, x1, y1, mPaint)
-            // 原版符号下移绘制
-            if (keyIcon != null) {
-                val intrinsicWidth = keyIcon.intrinsicWidth
-                val intrinsicHeight = keyIcon.intrinsicHeight
-                val marginLeft = (softKey.width() - intrinsicWidth) / 2
-                val marginRight = softKey.width() - intrinsicWidth - marginLeft
-                // 符号放在下半部分
-                val iconTop = softKey.mTop + softKey.height() * 0.55f
-                val marginTop = iconTop.toInt()
-                val marginBottom = (softKey.mBottom - (iconTop + intrinsicHeight)).toInt()
-                keyIcon.setTint(mActiveTheme.keyTextColor)
-                keyIcon.setBounds(softKey.mLeft + marginLeft, softKey.mTop + marginTop, softKey.mRight - marginRight, softKey.mBottom - marginBottom)
-                keyIcon.draw(canvas)
-            }
         } else if (!TextUtils.isEmpty(keyLabel)) { //Label位于中间
             mPaint.color = textColor
             if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
@@ -300,6 +279,60 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             val y = softKey.mTop + weightHeigth * 3 + weightHeigth / 2.0f
             canvas.drawText(keyMnemonic, x, y, mPaint)
         }
+    }
+
+    private fun spaceImeName(): String? {
+        if (InputModeSwitcher.isNumberSkb || InputModeSwitcher.isTextEditSkb) return null
+        if (InputModeSwitcher.isEnglish) return "英文"
+        if (!InputModeSwitcher.isChinese) return null
+        val schema = InputDispatcher.getCurrentRimeSchema()
+        return when {
+            schema == CustomConstant.SCHEMA_ZH_T9 -> "拼音9键"
+            schema == CustomConstant.SCHEMA_ZH_QWERTY -> "拼音全键"
+            schema == CustomConstant.SCHEMA_ZH_HANDWRITING -> "手写"
+            schema == CustomConstant.SCHEMA_ZH_STROKE -> "笔画"
+            schema == CustomConstant.SCHEMA_ZH_DOUBLE_LX17 -> "乱序17"
+            schema.endsWith("flypy") -> "小鹤双拼"
+            schema.endsWith("mspy") -> "微软双拼"
+            schema.endsWith("sogou") -> "搜狗双拼"
+            schema.endsWith("ziguang") -> "紫光双拼"
+            schema.endsWith("natural") -> "自然码"
+            schema.endsWith("abc") -> "智能ABC"
+            else -> null
+        }
+    }
+
+    private val spacePath = android.graphics.Path()
+
+    private fun drawSpaceWithName(canvas: Canvas, softKey: SoftKey, name: String, textColor: Int) {
+        val density = resources.displayMetrics.density
+        mPaint.color = textColor
+        mPaint.style = Paint.Style.FILL
+        mPaint.typeface = if (keyboardFontBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.75f   // 名称字号
+        val fm = mPaint.fontMetrics
+        val textH = fm.descent - fm.ascent
+        val gap = 6f * density                                     // 名称与空格符间距
+        val symW = min(softKey.width() * 0.30f, 40f * density)     // 空格符宽
+        val symH = 5f * density                                    // 空格符高
+        // 名称+间距+空格符 整体垂直居中
+        val top = softKey.mTop + (softKey.height() - (textH + gap + symH)) / 2f
+        val cx = softKey.mLeft + softKey.width() / 2f
+        canvas.drawText(name, cx - mPaint.measureText(name) / 2f, top - fm.ascent, mPaint)
+        val symTop = top + textH + gap
+        spacePath.reset()
+        spacePath.moveTo(cx - symW / 2f, symTop)
+        spacePath.lineTo(cx - symW / 2f, symTop + symH)
+        spacePath.lineTo(cx + symW / 2f, symTop + symH)
+        spacePath.lineTo(cx + symW / 2f, symTop)
+        mPaint.style = Paint.Style.STROKE
+        mPaint.strokeWidth = 1.6f * density
+        mPaint.strokeCap = Paint.Cap.ROUND
+        mPaint.strokeJoin = Paint.Join.ROUND
+        mPaint.alpha = 160
+        canvas.drawPath(spacePath, mPaint)
+        mPaint.alpha = 255
+        mPaint.style = Paint.Style.FILL
     }
 
     override fun onDetachedFromWindow() {
