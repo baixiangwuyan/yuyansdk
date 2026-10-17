@@ -279,6 +279,9 @@ object InputModeSwitcher {
             KeyEvent.META_CAPS_LOCK_ON
         } else if (MASK_CASE_LOWER == mToggleStates.modifiers) {
             KeyEvent.META_SHIFT_ON
+        } else if (KeyEvent.META_SHIFT_ON == mToggleStates.modifiers) {
+            // one-shot 状态再按一下 → 进入大写锁定
+            KeyEvent.META_CAPS_LOCK_ON
         } else {
             MASK_CASE_LOWER
         }
