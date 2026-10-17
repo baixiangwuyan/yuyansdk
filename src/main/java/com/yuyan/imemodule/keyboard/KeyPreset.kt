@@ -222,7 +222,7 @@ object KeyPreset {
         KeyEvent.KEYCODE_W to arrayOf("WXYZ", "9"),
         KeyEvent.KEYCODE_CLEAR to arrayOf("重输"),
         KeyEvent.KEYCODE_APOSTROPHE to arrayOf("分词", "1"),
-        KeyEvent.KEYCODE_AT to arrayOf("@"),
+        KeyEvent.KEYCODE_AT to arrayOf("繁/简"),
         InputModeSwitcher.USER_KEYCODE_COMMA_EMOJI to  arrayOf("，"),
         InputModeSwitcher.USER_KEYCODE_LEFT_COMMA to arrayOf("，", "。"),
         InputModeSwitcher.USER_KEYCODE_LEFT_PERIOD to arrayOf("。", "，"),

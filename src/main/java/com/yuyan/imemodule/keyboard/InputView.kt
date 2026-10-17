@@ -343,6 +343,16 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
             processFunctionKey(event)
             return true
         }
+        // 中文9键的 @ 键改为繁/简切换键（不限制 isChineseT9，确保能触发）
+        if (event.keyCode == KeyEvent.KEYCODE_AT) {
+            try {
+                val chineseFanTi = appPrefs.input.chineseFanTi.getValue()
+                appPrefs.input.chineseFanTi.setValue(!chineseFanTi)
+                InputDispatcher.nativeUpdateImeOption()
+                KeyboardManager.instance.switchKeyboard()
+            } catch (_: Exception) { }
+            return true
+        }
         InputModeSwitcher.resetCharCase()
         val englishCellDisable = InputModeSwitcher.isEnglish && !appPrefs.input.abcSearchEnglishCell.getValue()
         return when {

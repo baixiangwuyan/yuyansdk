@@ -179,6 +179,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             val background = when (softKey.code) {
                 KeyEvent.KEYCODE_ENTER -> mActiveTheme.accentKeyBackgroundColor
                 KeyEvent.KEYCODE_SPACE-> mActiveTheme.functionKeyBackgroundColor
+                KeyEvent.KEYCODE_AT -> if (AppPrefs.getInstance().input.chineseFanTi.getValue()) mActiveTheme.accentKeyBackgroundColor else mActiveTheme.keyBackgroundColor
                 else  -> mActiveTheme.keyBackgroundColor
             }
             bg.setColor(background)
