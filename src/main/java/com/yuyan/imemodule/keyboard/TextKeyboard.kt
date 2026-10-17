@@ -254,17 +254,25 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             mPaint.color = textColor
             if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
             val fontHeight = mFmi.bottom - mFmi.top
-            // 文字在按键中央，加大
+            // 文字在按键中央，加大（9键无符号时完全居中，有符号时偏上）
             mPaint.textSize = mNormalKeyTextSize.toFloat() * 1.0f
+            val is9Key = keyLabel.contains("9键")
             val x1 = softKey.mLeft + (softKey.width() - mPaint.measureText(keyLabel)) / 2.0f
-            val y1 = softKey.mTop + softKey.height() * 0.42f + fontHeight * 0.5f
+            val y1 = if (is9Key) {
+                softKey.mTop + softKey.height() * 0.5f + fontHeight * 0.5f
+            } else {
+                softKey.mTop + softKey.height() * 0.42f + fontHeight * 0.5f
+            }
             canvas.drawText(keyLabel, x1, y1, mPaint)
-            // 空格符号居中靠下，用短版 └─┘，调小
+            // 空格符号居中靠下，用短版 └─┘，调小（9键只显示文字，不画符号）
             val symbol = "└──┘"
             mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.9f
-            val x2 = softKey.mLeft + (softKey.width() - mPaint.measureText(symbol)) / 2.0f
-            val y2 = softKey.mTop + softKey.height() * 0.85f + fontHeight * 0.5f
-            canvas.drawText(symbol, x2, y2, mPaint)
+            // 9键（拼音9键）不画符号，26键才画
+            if (!keyLabel.contains("9键")) {
+                val x2 = softKey.mLeft + (softKey.width() - mPaint.measureText(symbol)) / 2.0f
+                val y2 = softKey.mTop + softKey.height() * 0.85f + fontHeight * 0.5f
+                canvas.drawText(symbol, x2, y2, mPaint)
+            }
         } else if (!TextUtils.isEmpty(keyLabel)) { //Label位于中间
             mPaint.color = textColor
             if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
