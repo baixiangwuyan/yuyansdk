@@ -89,7 +89,8 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             KeyEvent.META_SHIFT_ON -> 1       // 蓝轮廓：大写一个后回小写
             else -> 0                         // 灰：小写
         }
-        softKey?.enableToggleState(shiftState)
+        val isEnglishCell = AppPrefs.getInstance().input.abcSearchEnglishCell.getValue()
+        softKey?.enableToggleState(shiftState + if(isEnglishCell) 3 else 0)
         invalidateView()
     }
 
