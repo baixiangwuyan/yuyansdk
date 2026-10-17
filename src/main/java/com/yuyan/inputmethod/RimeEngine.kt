@@ -83,25 +83,7 @@ object RimeEngine {
         return if (Rime.hasRight()) {
             Rime.processKey(keyRecordStack.getRimeKeycodeByName("Page_Down"), 0)
            val candidates = Rime.getRimeContext()!!.candidates
-            if (InputModeSwitcher.isEnglish) {
-                for (item in candidates) item.text = applyTypedCase(item.text)
-            } else when (charCase) {
-                KeyEvent.META_SHIFT_ON -> {
-                    for (item in candidates) {
-                        item.text = item.text.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-                    }
-                }
-                KeyEvent.META_CAPS_LOCK_ON -> {
-                    for (item in candidates) {
-                        item.text = item.text.uppercase()
-                    }
-                }
-                else -> {
-                    for (item in candidates) {
-                        item.text = item.text.lowercase()
-                    }
-                }
-            }
+            for (item in candidates) item.text = applyCase(item.text)
             candidates
         } else emptyArray()
     }
@@ -157,15 +139,7 @@ object RimeEngine {
         if (rimeCommit != null) {
             keyRecordStack.clear()
             preCommitText = rimeCommit.commitText
-            preCommitText = if (InputModeSwitcher.isEnglish) {
-                applyTypedCase(preCommitText)
-            } else if (charCase == KeyEvent.META_SHIFT_ON) {
-                preCommitText.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-            } else if (charCase == KeyEvent.META_CAPS_LOCK_ON) {
-                preCommitText.uppercase()
-            } else {
-                preCommitText.lowercase()
-            }
+            preCommitText = applyCase(preCommitText)
             typedCase.clear()
             showComposition = ""
             showCandidates = emptyList()
@@ -192,24 +166,8 @@ object RimeEngine {
                 if (inputKey is InputKey.T9Key) inputKey.consumed = count-- <= 0
             }
         }
-        var composition = getCurrentComposition(candidates)
-        if (InputModeSwitcher.isEnglish) {
-            for (item in showCandidates) item.text = applyTypedCase(item.text)
-            composition = applyTypedCase(composition)
-        } else when (charCase) {
-            KeyEvent.META_SHIFT_ON -> {
-                for (item in showCandidates) item.text = item.text.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-                composition = composition.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-            }
-            KeyEvent.META_CAPS_LOCK_ON -> {
-                for (item in showCandidates) item.text = item.text.uppercase()
-                composition = composition.uppercase()
-            }
-            else -> {
-                for (item in showCandidates) item.text = item.text.lowercase()
-                composition = composition.lowercase()
-            }
-        }
+        for (item in showCandidates) item.text = applyCase(item.text)
+        val composition = applyCase(getCurrentComposition(candidates))
         val rimeSchema = Rime.getCurrentRimeSchema()
         pinyins = when (rimeSchema) {
             CustomConstant.SCHEMA_ZH_T9 -> {
@@ -262,6 +220,14 @@ object RimeEngine {
      */
     fun setImeOption(option: String, value: Boolean) {
         Rime.setOption(option, value)
+    }
+
+    /** 统一的大小写处理：英文按逐字母记录，其它按 Shift 状态（原来三处重复的代码合并到这里） */
+    private fun applyCase(text: String): String = when {
+        InputModeSwitcher.isEnglish -> applyTypedCase(text)
+        charCase == KeyEvent.META_SHIFT_ON -> text.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) }
+        charCase == KeyEvent.META_CAPS_LOCK_ON -> text.uppercase()
+        else -> text.lowercase()
     }
 
     private fun applyTypedCase(text: String): String {

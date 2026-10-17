@@ -23,12 +23,9 @@ import com.yuyan.imemodule.service.DictDecoder
 import com.yuyan.imemodule.singleton.EnvironmentSingleton.Companion.instance
 import kotlin.math.max
 import kotlin.math.min
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withSave
-import com.yuyan.imemodule.R
 import com.yuyan.imemodule.application.CustomConstant
-import com.yuyan.imemodule.application.Launcher
 import com.yuyan.imemodule.prefs.behavior.SkbStyleMode
 import com.yuyan.imemodule.service.InputDispatcher
 
