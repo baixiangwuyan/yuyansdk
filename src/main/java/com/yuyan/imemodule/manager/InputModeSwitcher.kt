@@ -282,6 +282,7 @@ object InputModeSwitcher {
         } else {
             MASK_CASE_LOWER
         }
+        lsatClickTime = System.currentTimeMillis()
         InputDispatcher.setCharCase(mToggleStates.modifiers)
         lsatClickTime = System.currentTimeMillis()
         (KeyboardManager.instance.currentContainer as? InputBaseContainer)?.updateStates()
