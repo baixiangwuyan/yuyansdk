@@ -258,6 +258,22 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             keyIcon.setTint(mActiveTheme.keyTextColor)
             keyIcon.setBounds(softKey.mLeft + marginLeft, softKey.mTop + marginTop, softKey.mRight - marginRight, softKey.mBottom - marginBottom)
             keyIcon.draw(canvas)
+        } else if (softKey.code == KeyEvent.KEYCODE_SPACE && !TextUtils.isEmpty(keyLabel)) {
+            // 空格键：文字在上，空格符号在下
+            mPaint.color = textColor
+            if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
+            mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.8f
+            val fontHeight = mFmi.bottom - mFmi.top
+            // 文字居中偏上
+            val x1 = softKey.mLeft + (softKey.width() - mPaint.measureText(keyLabel)) / 2.0f
+            val y1 = softKey.mTop + softKey.height() * 0.35f + fontHeight * 0.5f
+            canvas.drawText(keyLabel, x1, y1, mPaint)
+            // 空格符号"—"居中偏下
+            val symbol = "—"
+            mPaint.textSize = mNormalKeyTextSize.toFloat()
+            val x2 = softKey.mLeft + (softKey.width() - mPaint.measureText(symbol)) / 2.0f
+            val y2 = softKey.mTop + softKey.height() * 0.70f + fontHeight * 0.5f
+            canvas.drawText(symbol, x2, y2, mPaint)
         } else if (!TextUtils.isEmpty(keyLabel)) { //Label位于中间
             mPaint.color = textColor
             if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
