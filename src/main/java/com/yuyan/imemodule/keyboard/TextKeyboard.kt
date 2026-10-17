@@ -248,6 +248,30 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             keyIcon.setTint(mActiveTheme.keyTextColor)
             keyIcon.setBounds(softKey.mLeft + marginLeft, softKey.mTop + marginTop, softKey.mRight - marginRight, softKey.mBottom - marginBottom)
             keyIcon.draw(canvas)
+        } else if (softKey.code == KeyEvent.KEYCODE_SPACE && !TextUtils.isEmpty(keyLabel) &&
+            (keyLabel.contains("拼音9键") || keyLabel.contains("拼音全键"))) {
+            // 空格键：文字在上（输入法名称），原版符号在下（下移）
+            mPaint.color = textColor
+            if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
+            val fontHeight = mFmi.bottom - mFmi.top
+            mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.85f
+            val x1 = softKey.mLeft + (softKey.width() - mPaint.measureText(keyLabel)) / 2.0f
+            val y1 = softKey.mTop + softKey.height() * 0.32f + fontHeight * 0.5f
+            canvas.drawText(keyLabel, x1, y1, mPaint)
+            // 原版符号下移绘制
+            if (keyIcon != null) {
+                val intrinsicWidth = keyIcon.intrinsicWidth
+                val intrinsicHeight = keyIcon.intrinsicHeight
+                val marginLeft = (softKey.width() - intrinsicWidth) / 2
+                val marginRight = softKey.width() - intrinsicWidth - marginLeft
+                // 符号放在下半部分
+                val iconTop = softKey.mTop + softKey.height() * 0.55f
+                val marginTop = iconTop.toInt()
+                val marginBottom = (softKey.mBottom - (iconTop + intrinsicHeight)).toInt()
+                keyIcon.setTint(mActiveTheme.keyTextColor)
+                keyIcon.setBounds(softKey.mLeft + marginLeft, softKey.mTop + marginTop, softKey.mRight - marginRight, softKey.mBottom - marginBottom)
+                keyIcon.draw(canvas)
+            }
         } else if (!TextUtils.isEmpty(keyLabel)) { //Label位于中间
             mPaint.color = textColor
             if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
