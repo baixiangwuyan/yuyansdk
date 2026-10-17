@@ -28,6 +28,7 @@ import androidx.core.view.postDelayed
 import com.yuyan.imemodule.R
 import com.yuyan.imemodule.application.CustomConstant
 import com.yuyan.imemodule.callback.CandidateViewListener
+import com.yuyan.imemodule.data.emojicon.YuyanEmojiCompat
 import com.yuyan.imemodule.callback.IKeyboardView
 import com.yuyan.imemodule.callback.IResponseKeyEvent
 import com.yuyan.imemodule.data.emojicon.EmojiconData.SymbolPreset
@@ -343,6 +344,16 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
             processFunctionKey(event)
             return true
         }
+        // 密码框：不走引擎、不走花漫字体，先读 Shift 再重置
+        if (isPasswordField() && event.keyCode in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z) {
+            val m = InputModeSwitcher.mToggleStates.modifiers
+            val upper = m == KeyEvent.META_SHIFT_ON || m == KeyEvent.META_CAPS_LOCK_ON
+            val ch = ('a' + (event.keyCode - KeyEvent.KEYCODE_A)).toString()
+            textBeforeCursors.clear()
+            service.commitRaw(if (upper) ch.uppercase() else ch)
+            InputModeSwitcher.resetCharCase()   // 上屏后再重置单次 Shift
+            return true
+        }
         // 中文9键的 @ 键改为繁/简切换键（不限制 isChineseT9，确保能触发）
         if (event.keyCode == KeyEvent.KEYCODE_AT) {
             try {
@@ -363,6 +374,16 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
 //        return if(appPrefs.input.abcSearchEnglishCell.getValue() || InputModeSwitcherManager.isChinese)processInput(event) else processEnglishKey(event)
     }
 
+    private fun isPasswordField(): Boolean {
+        val info = YuyanEmojiCompat.mEditorInfo ?: return false
+        val cls = info.inputType and EditorInfo.TYPE_MASK_CLASS
+        val v = info.inputType and EditorInfo.TYPE_MASK_VARIATION
+        return (cls == EditorInfo.TYPE_CLASS_TEXT && (v == EditorInfo.TYPE_TEXT_VARIATION_PASSWORD
+            || v == EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            || v == EditorInfo.TYPE_TEXT_VARIATION_WEB_PASSWORD)) ||
+            (cls == EditorInfo.TYPE_CLASS_NUMBER && v == EditorInfo.TYPE_NUMBER_VARIATION_PASSWORD)
+    }
+
     private fun processEnglishKey(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
         val keyChar = event.unicodeChar
@@ -375,11 +396,7 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
             }
             keyCode in (KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z) -> {
                 textBeforeCursors.clear()
-                // 修复密码框大小写：直接看 Shift 修饰符状态
-                val modifiers = InputModeSwitcher.mToggleStates.modifiers
-                val isUpper = modifiers == KeyEvent.META_SHIFT_ON || modifiers == KeyEvent.META_CAPS_LOCK_ON
-                val finalLabel = if (isUpper) label.uppercase() else label
-                commitText(finalLabel)
+                commitText(label)
             }
             keyCode != 0 -> sendKeyEvent(keyCode)
             label.isNotEmpty() -> if (SymbolPreset.containsKey(label)) commitPairSymbol(label) else commitText(label)
