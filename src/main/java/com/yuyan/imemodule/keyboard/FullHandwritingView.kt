@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.View
 import com.yuyan.imemodule.data.theme.ThemeManager
 import com.yuyan.imemodule.entity.keyboard.SoftKey
+import com.yuyan.imemodule.keyboard.container.HandwritingContainer
 import com.yuyan.imemodule.manager.InputModeSwitcher
 import com.yuyan.imemodule.prefs.AppPrefs
 import com.yuyan.inputmethod.HWEngine
@@ -53,6 +54,7 @@ class FullHandwritingView(context: Context, private val inputView: InputView) : 
         val y = me.y
         when (me.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                if (shouldPassThrough(x + loc[0], y + loc[1])) return false
                 removeCallbacks(clearRunnable)
                 val last = HwStrokes.lastUpTime
                 if (last != 0L && System.currentTimeMillis() - last > HwStrokes.times) {
@@ -87,6 +89,22 @@ class FullHandwritingView(context: Context, private val inputView: InputView) : 
         }
         invalidate()
         return true
+    }
+
+    private val tmpLoc = IntArray(2)
+
+    /** 落笔点在候选栏、按键上时不接管，交给下面的键盘；落在键盘手写空白区或键盘上方则由本层书写 */
+    private fun shouldPassThrough(wx: Float, wy: Float): Boolean {
+        val root = inputView.mSkbRoot
+        root.getLocationInWindow(tmpLoc)
+        val inRoot = wx >= tmpLoc[0] && wx < tmpLoc[0] + root.width && wy >= tmpLoc[1] && wy < tmpLoc[1] + root.height
+        if (!inRoot) return false // 键盘上方：全屏书写
+        val kb = (KeyboardManager.instance.currentContainer as? HandwritingContainer)?.handwritingKeyboardView ?: return true
+        kb.getLocationInWindow(tmpLoc)
+        val kx = (wx - tmpLoc[0]).toInt()
+        val ky = (wy - tmpLoc[1]).toInt()
+        if (kx < 0 || ky < 0 || kx >= kb.width || ky >= kb.height) return true // 候选栏等其它区域
+        return kb.getKeyIndices(kx, ky) != null // 按在按键上就放行
     }
 
     private fun moveTo(x: Float, y: Float) {

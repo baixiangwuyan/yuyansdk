@@ -99,11 +99,10 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
         initNavbarBackground(service)
         mSkbRoot = LayoutInflater.from(context).inflate(R.layout.sdk_skb_container, this, false) as RelativeLayout
         addView(mSkbRoot)
-        // 全屏手写层：铺在键盘上方，只在开启“全屏手写”且处于手写键盘时接收触摸
+        // 全屏手写层：盖住整个输入法窗口（含键盘手写区），笔迹不会在键盘顶部被截断；
+        // 落在按键/候选栏上的触摸会放行给下面的键盘。只在开启“全屏手写”且处于手写键盘时生效
         mFullHandwritingView = FullHandwritingView(context, this)
-        addView(mFullHandwritingView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply {
-            addRule(ABOVE, mSkbRoot.id)
-        })
+        addView(mFullHandwritingView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         mSkbCandidatesBarView = mSkbRoot.findViewById(R.id.candidates_bar)
         mHoderLayoutLeft = mSkbRoot.findViewById(R.id.ll_skb_holder_layout_left)
         mHoderLayoutRight = mSkbRoot.findViewById(R.id.ll_skb_holder_layout_right)
@@ -473,10 +472,11 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
             }
             InputModeSwitcher.USER_KEYCODE_EMOJI -> onSettingsMenuClick(SkbMenuMode.Emojicon)
             InputModeSwitcher.USER_KEYCODE_HW_FULL_SCREEN -> {
-                // 全屏/半屏手写切换：改开关、刷新键盘（按键文字跟着变），清掉残留笔迹
+                // 全屏/半屏手写切换：改开关、换布局（半屏原样式，全屏两行按键），清掉残留笔迹
                 val pref = appPrefs.handwriting.handWritingFullScreen
                 pref.setValue(!pref.getValue())
                 mFullHandwritingView.clearInk()
+                KeyboardLoaderUtil.instance.clearKeyboardMap() // 全屏/半屏两套布局，切换时重建
                 KeyboardManager.instance.currentContainer?.updateSkbLayout()
                 requestLayout() // 触发重新计算可触摸区域（全屏时整窗可写，半屏时只有键盘）
             }
@@ -762,6 +762,12 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
 
     override fun onWindowShown() {
         chinesePrediction = appPrefs.input.chinesePrediction.getValue()
+        // 在设置页切换了全屏手写：重建手写键盘布局
+        if (KeyboardLoaderUtil.instance.refreshHandwritingIfChanged()) {
+            KeyboardLoaderUtil.instance.clearKeyboardMap()
+            KeyboardManager.instance.clearKeyboard()
+            KeyboardManager.instance.switchKeyboard()
+        }
     }
 
     override fun onWindowHidden() {

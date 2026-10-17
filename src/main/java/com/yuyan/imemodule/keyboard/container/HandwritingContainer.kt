@@ -22,6 +22,7 @@ import com.yuyan.imemodule.utils.AppUtil
 import com.yuyan.imemodule.utils.KeyboardLoaderUtil.Companion.instance
 import com.yuyan.imemodule.keyboard.InputView
 import com.yuyan.imemodule.keyboard.HandwritingKeyboard
+import com.yuyan.imemodule.keyboard.TextKeyboard
 import com.yuyan.imemodule.libs.recyclerview.SwipeRecyclerView
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.endOfParent
@@ -62,6 +63,9 @@ class HandwritingContainer(context: Context?, inputView: InputView) : InputBaseC
         mLlAddSymbol.addView(ivAddSymbol)
         mSideSymbolsPinyin = DataBaseKT.instance.sideSymbolDao().getAllSideSymbolPinyin()
     }
+
+    /** 手写键盘视图，供全屏手写层判断落笔点是否在按键上 */
+    val handwritingKeyboardView: TextKeyboard? get() = mMajorView
 
     /**
      * 更新软键盘布局
