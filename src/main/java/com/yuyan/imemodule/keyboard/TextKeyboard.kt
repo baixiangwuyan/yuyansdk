@@ -195,14 +195,21 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
                 bg.setBounds(softKey.mLeft + keyMarginX, softKey.mTop + keyMarginY, softKey.mRight - keyMarginX, softKey.mBottom - keyMarginY)
                 bg.draw(canvas)
         }
-        var keyLabel = if(skbStyleMode == SkbStyleMode.Google){
+        var keyLabel = if(softKey.code == KeyEvent.KEYCODE_AT) {
+            // 繁/简键动态显示单字：繁体显示"繁"，简体显示"简"
+            if (AppPrefs.getInstance().input.chineseFanTi.getValue()) "繁" else "简"
+        } else if(softKey.code == KeyEvent.KEYCODE_ENTER) {
+            // 回车键显示"换行"文字
+            "换行"
+        } else if(skbStyleMode == SkbStyleMode.Google){
             if(InputModeSwitcher.isLower) softKey.keyLabel.lowercase() else softKey.keyLabel
         } else {
             if(InputModeSwitcher.isLower && InputModeSwitcher.isEnglish) softKey.keyLabel.lowercase() else softKey.keyLabel
         }
         val keyLabelSmall = softKey.getmKeyLabelSmall()
         val keyMnemonic = softKey.keyMnemonic
-        var keyIcon = if(skbStyleMode == SkbStyleMode.Google && softKey.code == KeyEvent.KEYCODE_SPACE) null
+        var keyIcon = if(softKey.code == KeyEvent.KEYCODE_ENTER) null
+            else if(skbStyleMode == SkbStyleMode.Google && softKey.code == KeyEvent.KEYCODE_SPACE) null
             else if(skbStyleMode == SkbStyleMode.Google && softKey.code == InputModeSwitcher.USER_KEYCODE_CURSOR_DIRECTION && !DictDecoder.isCandidatesEmpty) null
             else softKey.keyIcon
         val weightHeigth = softKey.height() / 4f
