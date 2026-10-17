@@ -262,15 +262,15 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             // 空格键：文字在上，空格符号在下
             mPaint.color = textColor
             if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
-            mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.8f
             val fontHeight = mFmi.bottom - mFmi.top
-            // 文字在按键中央
+            // 文字在按键中央，加大
+            mPaint.textSize = mNormalKeyTextSize.toFloat() * 1.0f
             val x1 = softKey.mLeft + (softKey.width() - mPaint.measureText(keyLabel)) / 2.0f
-            val y1 = softKey.mTop + softKey.height() * 0.45f + fontHeight * 0.5f
+            val y1 = softKey.mTop + softKey.height() * 0.42f + fontHeight * 0.5f
             canvas.drawText(keyLabel, x1, y1, mPaint)
-            // 空格符号居中靠下，用短版 └─┘
+            // 空格符号居中靠下，用短版 └─┘，调小
             val symbol = "└──┘"
-            mPaint.textSize = mNormalKeyTextSize.toFloat() * 1.2f
+            mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.9f
             val x2 = softKey.mLeft + (softKey.width() - mPaint.measureText(symbol)) / 2.0f
             val y2 = softKey.mTop + softKey.height() * 0.85f + fontHeight * 0.5f
             canvas.drawText(symbol, x2, y2, mPaint)
