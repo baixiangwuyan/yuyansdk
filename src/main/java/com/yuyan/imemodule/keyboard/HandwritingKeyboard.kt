@@ -87,9 +87,11 @@ class HandwritingKeyboard(context: Context?) : TextKeyboard(context) {
                 parent.requestDisallowInterceptTouchEvent(true)
                 mPoints.clear()
                 addPoint(getNewPoint(eventX, eventY))
+                touching = true
+                requestUnbufferedDispatch(me)
+                runnable.let { handler?.removeCallbacks(it) }
                 if (HwStrokes.lastUpTime != 0L && System.currentTimeMillis() - HwStrokes.lastUpTime > times) {
-                    mService!!.responseKeyEvent(SoftKey(InputModeSwitcher.USER_KEYCODE_SELECTED))
-                    mSBPoint.clear()
+                    HwStrokes.autoCommit(mService)
                     clear()
                 }
             }
@@ -100,6 +102,7 @@ class HandwritingKeyboard(context: Context?) : TextKeyboard(context) {
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 addPoint(getNewPoint(eventX, eventY))
                 parent.requestDisallowInterceptTouchEvent(true)
+                touching = false
                 HwStrokes.lastUpTime = System.currentTimeMillis()
                 mSBPoint.add(-1)
                 mSBPoint.add(0)
@@ -245,7 +248,10 @@ class HandwritingKeyboard(context: Context?) : TextKeyboard(context) {
     }
 
     // 清空笔迹
+    // 停笔超时：自动上屏第一个候选并清掉笔迹（只在抬笔后触发，写字过程中会被重置）
+    private var touching = false
     var runnable = Runnable {
+        if (!touching && HwStrokes.lastUpTime != 0L) HwStrokes.autoCommit(mService)
         clear()
     }
 }

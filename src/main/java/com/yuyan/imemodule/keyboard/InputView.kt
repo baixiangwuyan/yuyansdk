@@ -553,6 +553,12 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
     }
 
     fun chooseAndUpdate(candId: Int = mSkbCandidatesBarView.getActiveCandNo()) {
+        if (InputModeSwitcher.isChineseHandWriting) {
+            // 手写选字后清掉旧笔画，下一笔重新开始一个字
+            HwStrokes.points.clear()
+            HwStrokes.lastUpTime = 0L
+            mFullHandwritingView.clearInk()
+        }
         val candidate = DictDecoder.getCandidate(candId)
         if (candidate?.comment == "📋") {
             commitDecInfoText(candidate.text)
