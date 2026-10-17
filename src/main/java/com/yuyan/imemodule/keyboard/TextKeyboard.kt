@@ -310,16 +310,14 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         mPaint.style = Paint.Style.FILL
         mPaint.typeface = if (keyboardFontBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         mPaint.textSize = mNormalKeyTextSize.toFloat()            // 和“换行”一样大
-        val fm = mPaint.fontMetrics
-        val textH = fm.descent - fm.ascent
-        val gap = 5f * density                                     // 名称与空格符间距
         val symW = min(softKey.width() * 0.18f, 24f * density)     // 空格符宽
         val symH = 3.5f * density                                  // 空格符高
-        // 名称+间距+空格符 整体垂直居中
-        val top = softKey.mTop + (softKey.height() - (textH + gap + symH)) / 2f
         val cx = softKey.mLeft + softKey.width() / 2f
-        canvas.drawText(name, cx - mPaint.measureText(name) / 2f, top - fm.ascent, mPaint)
-        val symTop = top + textH + gap
+        // 文字基线：和“换行”等普通按键完全一样的算法，保证居中、对齐
+        val baseline = (softKey.mTop + softKey.mBottom) / 2.0f + (mFmi.bottom - mFmi.top)
+        canvas.drawText(name, cx - mPaint.measureText(name) / 2f, baseline, mPaint)
+        // 空格符：在文字下方，空出一个符号高度；防止超出按键底边
+        val symTop = min(baseline + symH, softKey.mBottom - symH - 2f * density)
         spacePath.reset()
         spacePath.moveTo(cx - symW / 2f, symTop)
         spacePath.lineTo(cx - symW / 2f, symTop + symH)
