@@ -23,8 +23,11 @@ import com.yuyan.imemodule.service.DictDecoder
 import com.yuyan.imemodule.singleton.EnvironmentSingleton.Companion.instance
 import kotlin.math.max
 import kotlin.math.min
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withSave
+import com.yuyan.imemodule.R
+import com.yuyan.imemodule.application.Launcher
 import com.yuyan.imemodule.prefs.behavior.SkbStyleMode
 import com.yuyan.imemodule.service.InputDispatcher
 
@@ -210,6 +213,15 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         val keyMnemonic = softKey.keyMnemonic
         var keyIcon = if(softKey.code == KeyEvent.KEYCODE_ENTER) null
             else if(softKey.code == KeyEvent.KEYCODE_SPACE) null
+            else if(softKey.code == KeyEvent.KEYCODE_SHIFT_LEFT) {
+                // Shift 图标根据大小写状态直接取，不依赖 ToggleState
+                val ctx = Launcher.instance.context
+                when (InputModeSwitcher.mToggleStates.modifiers) {
+                    KeyEvent.META_SHIFT_ON -> ContextCompat.getDrawable(ctx, R.drawable.huahua_shift_on)
+                    KeyEvent.META_CAPS_LOCK_ON -> ContextCompat.getDrawable(ctx, R.drawable.huahua_shift_lock)
+                    else -> ContextCompat.getDrawable(ctx, R.drawable.huahua_shift_off)
+                }
+            }
             else if(skbStyleMode == SkbStyleMode.Google && softKey.code == KeyEvent.KEYCODE_SPACE) null
             else if(skbStyleMode == SkbStyleMode.Google && softKey.code == InputModeSwitcher.USER_KEYCODE_CURSOR_DIRECTION && !DictDecoder.isCandidatesEmpty) null
             else softKey.keyIcon
