@@ -209,6 +209,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         val keyLabelSmall = softKey.getmKeyLabelSmall()
         val keyMnemonic = softKey.keyMnemonic
         var keyIcon = if(softKey.code == KeyEvent.KEYCODE_ENTER) null
+            else if(softKey.code == KeyEvent.KEYCODE_SPACE) null
             else if(skbStyleMode == SkbStyleMode.Google && softKey.code == KeyEvent.KEYCODE_SPACE) null
             else if(skbStyleMode == SkbStyleMode.Google && softKey.code == InputModeSwitcher.USER_KEYCODE_CURSOR_DIRECTION && !DictDecoder.isCandidatesEmpty) null
             else softKey.keyIcon
