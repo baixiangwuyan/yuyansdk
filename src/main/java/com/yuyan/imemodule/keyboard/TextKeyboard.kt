@@ -239,7 +239,8 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             val y = softKey.mTop + weightHeigth * 1.1f
             canvas.drawText(keyLabelSmall, x, y, mPaint)
         }
-        if (null != keyIcon) {
+        if (null != keyIcon && !(softKey.code == KeyEvent.KEYCODE_SPACE && !TextUtils.isEmpty(keyLabel) &&
+            (keyLabel.contains("拼音9键") || keyLabel.contains("拼音全键")))) {
             var  intrinsicWidth = keyIcon.intrinsicWidth
             var  intrinsicHeight = keyIcon.intrinsicHeight
             while(softKey.width() < intrinsicWidth || softKey.height() < intrinsicHeight){
