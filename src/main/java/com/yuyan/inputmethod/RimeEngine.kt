@@ -22,6 +22,7 @@ object RimeEngine {
     var showCandidates: List<CandidateListItem> = emptyList() // 所有待展示的候选词
     var showComposition: String = "" // 候选词上方展示的拼音
     var preCommitText: String = "" // 待提交的文字
+    private var rimeAssoc: List<String?> = emptyList()   // Rime 原始联想顺序
     private var customPhraseSize: Int = 0 // 自定义引擎候选词长度
     const val MASK_CASE_LOWER = 0
     private var charCase = 0x0000
@@ -115,12 +116,14 @@ object RimeEngine {
         pinyins = emptyArray()
         if (text.isNotEmpty()) {
             showCandidates = buildList {
+                val seen = HashSet<String>()
+                fun addWord(w: String?) { if (!w.isNullOrEmpty() && seen.add(w)) add(CandidateListItem("", w)) }
+                UserNextWord.onText(text).forEach(::addWord)          // 你常接的词排最前
                 val words = Rime.getAssociateList(text)
-                val firstFive = words.take(5)
-                addAll(firstFive.filterNotNull().map { CandidateListItem("", it) })
-                addAll(CustomEngine.predictAssociationWordsChinese(text).map { CandidateListItem("", it) })
-                val remaining = words.drop(5)
-                addAll(remaining.filterNotNull().map { CandidateListItem("", it) })
+                rimeAssoc = words.toList()
+                words.take(5).forEach(::addWord)
+                CustomEngine.predictAssociationWordsChinese(text).forEach(::addWord)
+                words.drop(5).forEach(::addWord)
             }
             showComposition = ""
         }
@@ -128,9 +131,12 @@ object RimeEngine {
 
     fun selectAssociation(index: Int) {
         val indexReal = index - customPhraseSize
-        Rime.chooseAssociate(indexReal)
+        val word = showCandidates.getOrNull(indexReal)?.text ?: ""
+        // 列表顺序被重排过，按词找回它在 Rime 联想里的位置；不是 Rime 的词就不通知 Rime
+        val rimeIndex = rimeAssoc.indexOf(word)
+        if (rimeIndex >= 0) Rime.chooseAssociate(rimeIndex)
         updateCandidatesOrCommitText()
-        preCommitText = showCandidates.getOrNull(indexReal)?.text?:""
+        preCommitText = word
     }
 
     fun reset() {

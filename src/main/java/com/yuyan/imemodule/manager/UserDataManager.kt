@@ -17,6 +17,7 @@ import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import com.yuyan.inputmethod.UserNextWord
 
 object UserDataManager {
 
@@ -51,6 +52,7 @@ object UserDataManager {
 
     @OptIn(ExperimentalSerializationApi::class)
     fun export(dest: OutputStream, timestamp: Long = System.currentTimeMillis()) = runCatching {
+        UserNextWord.save(sync = true)   // 先把内存里的联想记录写盘
         ZipOutputStream(dest.buffered()).use { zipStream ->
             // shared_prefs
             writeFileTree(sharedPrefsDir, "shared_prefs", zipStream)
@@ -90,6 +92,7 @@ object UserDataManager {
                 copyDir(File(tempDir, "shared_prefs"), sharedPrefsDir)
                 copyDir(File(tempDir, "databases"), dataBasesDir)
                 copyDir(File(tempDir, "external"), externalDir)
+                UserNextWord.reload()
                 metadata
             }
         }

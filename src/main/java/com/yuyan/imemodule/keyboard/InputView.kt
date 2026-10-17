@@ -30,6 +30,7 @@ import com.yuyan.imemodule.application.CustomConstant
 import com.yuyan.imemodule.callback.CandidateViewListener
 import com.yuyan.imemodule.data.emojicon.YuyanEmojiCompat
 import com.yuyan.inputmethod.RimeEngine
+import com.yuyan.inputmethod.UserNextWord
 import com.yuyan.imemodule.callback.IKeyboardView
 import com.yuyan.imemodule.callback.IResponseKeyEvent
 import com.yuyan.imemodule.data.emojicon.EmojiconData.SymbolPreset
@@ -728,6 +729,7 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
 
     override fun onStartInputView(editorInfo: EditorInfo, restarting: Boolean) {
         if (!restarting) {
+            UserNextWord.resetContext()
             resetToIdleState()
             val clipboard = appPrefs.clipboard
             if (clipboard.clipboardSuggestion.getValue()) {
@@ -756,6 +758,7 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
         }
         KeyboardManager.instance.switchKeyboard()
         resetToIdleState()
+        UserNextWord.save()
     }
 
     override fun updatePosition(anchor: FloatArray) {}
