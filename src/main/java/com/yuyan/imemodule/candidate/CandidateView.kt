@@ -132,7 +132,7 @@ class CandidateView(context: Context, private val service: ImeService) : IKeyboa
                 if(keyCode == KeyEvent.KEYCODE_SPACE && event.isCtrlPressed ){
                     InputModeSwitcher.switchModeForUserKey(InputModeSwitcher.USER_KEYCODE_LANG)
                     resetToIdleState()
-                    Toast.makeText(context, if(InputModeSwitcher.isEnglish)"语燕输入法-英文" else "语燕输入法-拼音", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, if(InputModeSwitcher.isEnglish)"花花输入法-英文" else "花花输入法-拼音", Toast.LENGTH_LONG).show()
                 }
                 true
             }
