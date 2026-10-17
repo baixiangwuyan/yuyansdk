@@ -29,6 +29,7 @@ import com.yuyan.imemodule.R
 import com.yuyan.imemodule.application.CustomConstant
 import com.yuyan.imemodule.callback.CandidateViewListener
 import com.yuyan.imemodule.data.emojicon.YuyanEmojiCompat
+import com.yuyan.inputmethod.RimeEngine
 import com.yuyan.imemodule.callback.IKeyboardView
 import com.yuyan.imemodule.callback.IResponseKeyEvent
 import com.yuyan.imemodule.data.emojicon.EmojiconData.SymbolPreset
@@ -364,6 +365,8 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
             } catch (_: Exception) { }
             return true
         }
+        val m0 = InputModeSwitcher.mToggleStates.modifiers
+        RimeEngine.nextKeyUpper = m0 == KeyEvent.META_SHIFT_ON || m0 == KeyEvent.META_CAPS_LOCK_ON
         InputModeSwitcher.resetCharCase()
         val englishCellDisable = InputModeSwitcher.isEnglish && !appPrefs.input.abcSearchEnglishCell.getValue()
         return when {
