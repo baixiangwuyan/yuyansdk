@@ -10,6 +10,8 @@ import java.util.Objects
 
 val keyIconRecords: Map<Int, Drawable?> = mapOf(
     Objects.hash(KeyEvent.KEYCODE_SHIFT_LEFT, 0) to ContextCompat.getDrawable(Launcher.instance.context, R.drawable.huahua_shift_off),
+    Objects.hash(KeyEvent.KEYCODE_SHIFT_LEFT, 1) to ContextCompat.getDrawable(Launcher.instance.context, R.drawable.huahua_shift_on),
+    Objects.hash(KeyEvent.KEYCODE_SHIFT_LEFT, 2) to ContextCompat.getDrawable(Launcher.instance.context, R.drawable.huahua_shift_lock),
     Objects.hash(KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.META_SHIFT_ON) to ContextCompat.getDrawable(Launcher.instance.context, R.drawable.huahua_shift_on),
     Objects.hash(KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.META_CAPS_LOCK_ON) to ContextCompat.getDrawable(Launcher.instance.context, R.drawable.huahua_shift_lock),
     Objects.hash(KeyEvent.KEYCODE_SHIFT_LEFT, 3) to ContextCompat.getDrawable(Launcher.instance.context, R.drawable.huahua_shift_off),
