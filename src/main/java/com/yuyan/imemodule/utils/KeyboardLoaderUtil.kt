@@ -89,12 +89,11 @@ class KeyboardLoaderUtil private constructor() {
                 qwertyKeys.last().apply {
                     widthF = 0.147f
                 }
-                if(skbStyleMode == SkbStyleMode.Google) {
-                    val softKeyToggle = createKeyToggle(KeyEvent.KEYCODE_SHIFT_LEFT)
-                    softKeyToggle.widthF = 0.147f
-                    softKeyToggle.setToggleStates(shiftToggleStates)
-                    qwertyKeys[0] = softKeyToggle
-                }
+                // Shift 键始终用 Toggle，保证图标能按大小写状态切换（不限 Google 样式）
+                val softKeyToggle = createKeyToggle(KeyEvent.KEYCODE_SHIFT_LEFT)
+                softKeyToggle.widthF = 0.147f
+                softKeyToggle.setToggleStates(shiftToggleStates)
+                qwertyKeys[0] = softKeyToggle
                 keyBeans.addAll(qwertyKeys)
                 rows.add(keyBeans)
                 keyBeans = lastRows(skbValue)
