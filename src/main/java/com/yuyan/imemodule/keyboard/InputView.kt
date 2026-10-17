@@ -375,8 +375,10 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
             }
             keyCode in (KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z) -> {
                 textBeforeCursors.clear()
-                // 修复密码框大小写：根据 Shift 状态决定大小写
-                val finalLabel = if (InputModeSwitcher.isLower) label else label.uppercase()
+                // 修复密码框大小写：直接看 Shift 修饰符状态
+                val modifiers = InputModeSwitcher.mToggleStates.modifiers
+                val isUpper = modifiers == KeyEvent.META_SHIFT_ON || modifiers == KeyEvent.META_CAPS_LOCK_ON
+                val finalLabel = if (isUpper) label.uppercase() else label
                 commitText(finalLabel)
             }
             keyCode != 0 -> sendKeyEvent(keyCode)
