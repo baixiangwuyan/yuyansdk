@@ -268,9 +268,9 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             val x1 = softKey.mLeft + (softKey.width() - mPaint.measureText(keyLabel)) / 2.0f
             val y1 = softKey.mTop + softKey.height() * 0.35f + fontHeight * 0.5f
             canvas.drawText(keyLabel, x1, y1, mPaint)
-            // 空格符号"␣"居中偏下，加大加长
-            val symbol = "␣"
-            mPaint.textSize = mNormalKeyTextSize.toFloat() * 1.5f
+            // 空格符号居中偏下，用短版 └─┘
+            val symbol = "└──┘"
+            mPaint.textSize = mNormalKeyTextSize.toFloat() * 1.2f
             val x2 = softKey.mLeft + (softKey.width() - mPaint.measureText(symbol)) / 2.0f
             val y2 = softKey.mTop + softKey.height() * 0.70f + fontHeight * 0.5f
             canvas.drawText(symbol, x2, y2, mPaint)
