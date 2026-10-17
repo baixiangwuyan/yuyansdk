@@ -375,7 +375,9 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
             }
             keyCode in (KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z) -> {
                 textBeforeCursors.clear()
-                commitText(label)
+                // 修复密码框大小写：根据 Shift 状态决定大小写
+                val finalLabel = if (InputModeSwitcher.isLower) label else label.uppercase()
+                commitText(finalLabel)
             }
             keyCode != 0 -> sendKeyEvent(keyCode)
             label.isNotEmpty() -> if (SymbolPreset.containsKey(label)) commitPairSymbol(label) else commitText(label)
