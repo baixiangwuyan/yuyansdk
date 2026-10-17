@@ -264,9 +264,9 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
             mPaint.textSize = mNormalKeyTextSize.toFloat() * 0.8f
             val fontHeight = mFmi.bottom - mFmi.top
-            // 文字居中偏上
+            // 文字在按键中央
             val x1 = softKey.mLeft + (softKey.width() - mPaint.measureText(keyLabel)) / 2.0f
-            val y1 = softKey.mTop + softKey.height() * 0.30f + fontHeight * 0.5f
+            val y1 = softKey.mTop + softKey.height() * 0.45f + fontHeight * 0.5f
             canvas.drawText(keyLabel, x1, y1, mPaint)
             // 空格符号居中偏下，用短版 └─┘，拉开距离
             val symbol = "└──┘"
