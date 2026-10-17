@@ -26,8 +26,9 @@ class HandwritingKeyboard(context: Context?) : TextKeyboard(context) {
 
     private val mPointsCache: MutableList<TimedPoint> = ArrayList<TimedPoint>()
     private val mControlTimedPointsCached = ControlTimedPoints()
-    private var mLastUpTime: Long = 0 //记录上次手写抬手时间，与本次按下时间对比。
-    private val mSBPoint: MutableList<Short?> = LinkedList()
+    // 笔画坐标和抬笔时间与全屏手写层共用，坐标统一换算成窗口坐标
+    private val mSBPoint: MutableList<Short?> get() = HwStrokes.points
+    private val mWinLoc = IntArray(2)
     private var mPoints: MutableList<TimedPoint> =  ArrayList<TimedPoint>()
     private var mLastVelocity = 0f
     private var mLastWidth = 0f
@@ -75,8 +76,9 @@ class HandwritingKeyboard(context: Context?) : TextKeyboard(context) {
         if (softKey != null) {
             return super.onTouchEvent(me)
         }
-        mSBPoint.add(me.x.toInt().toShort())
-        mSBPoint.add(me.y.toInt().toShort())
+        getLocationInWindow(mWinLoc)
+        mSBPoint.add((me.x.toInt() + mWinLoc[0]).toShort())
+        mSBPoint.add((me.y.toInt() + mWinLoc[1]).toShort())
         when (me.action) {
             MotionEvent.ACTION_DOWN -> {
                 val paintWidthMax = getInstance().handwriting.handWritingWidth.getValue() * 4 / 10f
@@ -85,7 +87,7 @@ class HandwritingKeyboard(context: Context?) : TextKeyboard(context) {
                 parent.requestDisallowInterceptTouchEvent(true)
                 mPoints.clear()
                 addPoint(getNewPoint(eventX, eventY))
-                if (mLastUpTime != 0L && System.currentTimeMillis() - mLastUpTime > times) {
+                if (HwStrokes.lastUpTime != 0L && System.currentTimeMillis() - HwStrokes.lastUpTime > times) {
                     mService!!.responseKeyEvent(SoftKey(InputModeSwitcher.USER_KEYCODE_SELECTED))
                     mSBPoint.clear()
                     clear()
@@ -98,7 +100,7 @@ class HandwritingKeyboard(context: Context?) : TextKeyboard(context) {
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 addPoint(getNewPoint(eventX, eventY))
                 parent.requestDisallowInterceptTouchEvent(true)
-                mLastUpTime = System.currentTimeMillis()
+                HwStrokes.lastUpTime = System.currentTimeMillis()
                 mSBPoint.add(-1)
                 mSBPoint.add(0)
                 recognitionData()

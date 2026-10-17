@@ -79,6 +79,7 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
     var isAddPhrases = false
     private val mChoiceNotifier = ChoiceNotifier()
     var mSkbRoot: RelativeLayout
+    private val mFullHandwritingView: FullHandwritingView
     var mSkbCandidatesBarView: CandidatesBar
     private var mHoderLayoutLeft: LinearLayout
     private var mHoderLayoutRight: LinearLayout
@@ -98,6 +99,11 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
         initNavbarBackground(service)
         mSkbRoot = LayoutInflater.from(context).inflate(R.layout.sdk_skb_container, this, false) as RelativeLayout
         addView(mSkbRoot)
+        // 全屏手写层：铺在键盘上方，只在开启“全屏手写”且处于手写键盘时接收触摸
+        mFullHandwritingView = FullHandwritingView(context, this)
+        addView(mFullHandwritingView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply {
+            addRule(ABOVE, mSkbRoot.id)
+        })
         mSkbCandidatesBarView = mSkbRoot.findViewById(R.id.candidates_bar)
         mHoderLayoutLeft = mSkbRoot.findViewById(R.id.ll_skb_holder_layout_left)
         mHoderLayoutRight = mSkbRoot.findViewById(R.id.ll_skb_holder_layout_right)
@@ -466,6 +472,14 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
                 (KeyboardManager.instance.currentContainer as? SymbolContainer)?.setSymbolsView()
             }
             InputModeSwitcher.USER_KEYCODE_EMOJI -> onSettingsMenuClick(SkbMenuMode.Emojicon)
+            InputModeSwitcher.USER_KEYCODE_HW_FULL_SCREEN -> {
+                // 全屏/半屏手写切换：改开关、刷新键盘（按键文字跟着变），清掉残留笔迹
+                val pref = appPrefs.handwriting.handWritingFullScreen
+                pref.setValue(!pref.getValue())
+                mFullHandwritingView.clearInk()
+                KeyboardManager.instance.currentContainer?.updateSkbLayout()
+                requestLayout() // 触发重新计算可触摸区域（全屏时整窗可写，半屏时只有键盘）
+            }
             in InputModeSwitcher.USER_KEYCODE_RETURN..InputModeSwitcher.USER_KEYCODE_LANG -> InputModeSwitcher.switchModeForUserKey(keyCode)
             in InputModeSwitcher.USER_KEYCODE_PASTE..InputModeSwitcher.USER_KEYCODE_CUT -> commitTextEditMenu(KeyPreset.textEditMenuPreset[keyCode])
             InputModeSwitcher.USER_KEYCODE_MOVE_START -> service.setSelection(0, if (hasSelection) selEnd else 0)
@@ -758,10 +772,16 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
         }
         KeyboardManager.instance.switchKeyboard()
         resetToIdleState()
+        mFullHandwritingView.clearInk()
         UserNextWord.save()
     }
 
     override fun updatePosition(anchor: FloatArray) {}
+
+    /** 是否处于全屏手写：开关打开、当前是中文手写键盘、非悬浮键盘、不在编辑常用语 */
+    fun isFullHandwriting(): Boolean =
+        appPrefs.handwriting.handWritingFullScreen.getValue() && InputModeSwitcher.isChineseHandWriting &&
+            !EnvironmentSingleton.instance.keyboardModeFloat && !isAddPhrases
 
     override fun getKeyboardRect(): IntArray {
         val location = intArrayOf(0, 0).also {if(isAddPhrases) mAddPhrasesLayout.getLocationInWindow(it) else mSkbRoot.getLocationInWindow(it) }

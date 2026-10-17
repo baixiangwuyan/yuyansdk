@@ -43,6 +43,8 @@
     <string name="skb_item_custom">定制工具栏</string>
     <!--布局部分文件提取文本-->
     <string name="paint_thickness">笔画粗细</string>
+    <string name="hand_writing_full_screen">全屏手写</string>
+    <string name="hand_writing_full_screen_tips">键盘上方也能写字；手写时点不到上方页面，切换键盘即可恢复</string>
     <string name="discern_sensitive">识别灵敏度</string>
     <string name="keyboard_theme_night">深色模式</string>
     <!--设置输入法高度-->

@@ -168,6 +168,12 @@ class ImeService : InputMethodService() {
                 visibleTopInsets = EnvironmentSingleton.instance.mScreenHeight
                 touchableInsets = Insets.TOUCHABLE_INSETS_REGION
                 touchableRegion.set(x, y, x + width, y + height)
+            } else if ((mInputView as? InputView)?.isFullHandwriting() == true) {
+                // 全屏手写：应用布局不变（仍以键盘顶部为界），但整个窗口都可以写
+                contentTopInsets = y
+                visibleTopInsets = y
+                touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+                touchableRegion.set(0, 0, mInputView.width, mInputView.height)
             } else {
                 contentTopInsets = y
                 touchableInsets = Insets.TOUCHABLE_INSETS_CONTENT

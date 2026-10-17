@@ -90,9 +90,10 @@ class HandwritingContainer(context: Context?, inputView: InputView) : InputBaseC
             mRVRightSymbols.addFooterView(mLlAddSymbol)
         }
 
-        val softKeyboard = mMajorView?.getSoftKeyboard()
-        val softKeySymbolHolder = softKeyboard?.getKeyByCode(InputModeSwitcher.USER_KEYCODE_LEFT_SYMBOL)
-        add(mRVRightSymbols, lParams (width =softKeySymbolHolder!!.width(), height = matchParent).apply{
+        val softKeyboard = mMajorView?.getSoftKeyboard() ?: return
+        // 新手写布局没有右侧符号栏，占位键不存在时不显示侧边符号列表
+        val softKeySymbolHolder = softKeyboard.getKeyByCode(InputModeSwitcher.USER_KEYCODE_LEFT_SYMBOL) ?: return
+        add(mRVRightSymbols, lParams (width =softKeySymbolHolder.width(), height = matchParent).apply{
             endOfParent(0)
             setMargins(softKeyboard.keyXMargin, softKeySymbolHolder.mTop + softKeyboard.keyYMargin,
                     softKeyboard.keyXMargin, EnvironmentSingleton.instance.skbHeight - softKeySymbolHolder.mBottom + softKeyboard.keyYMargin)

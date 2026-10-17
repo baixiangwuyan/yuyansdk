@@ -212,6 +212,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
     inner class Handwriting : ManagedPreferenceCategory(R.string.setting_ime_input, sharedPreferences) {
 
+        val handWritingFullScreen = switch(
+            R.string.hand_writing_full_screen, "hand_writing_full_screen", false, R.string.hand_writing_full_screen_tips
+        )
+
 
         val handWritingWidth = int(
             R.string.paint_thickness,

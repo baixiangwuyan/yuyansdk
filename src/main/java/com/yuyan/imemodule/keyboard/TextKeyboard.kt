@@ -207,6 +207,9 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         var keyLabel = if(softKey.code == KeyEvent.KEYCODE_AT) {
             // 繁/简键动态显示单字：繁体显示"繁"，简体显示"简"
             if (AppPrefs.getInstance().input.chineseFanTi.getValue()) "繁" else "简"
+        } else if(softKey.code == InputModeSwitcher.USER_KEYCODE_HW_FULL_SCREEN) {
+            // 手写全屏/半屏切换键：显示点了之后要去的模式
+            if (AppPrefs.getInstance().handwriting.handWritingFullScreen.getValue()) "半屏" else "全屏"
         } else if(softKey.code == KeyEvent.KEYCODE_ENTER) {
             // 回车键显示"换行"文字
             "换行"

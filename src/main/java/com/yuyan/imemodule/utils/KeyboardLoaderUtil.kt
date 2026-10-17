@@ -129,21 +129,32 @@ class KeyboardLoaderUtil private constructor() {
                 rows.add(keyBeans)
 
             }
-            InputModeSwitcher.MASK_SKB_LAYOUT_HANDWRITING -> {// 3000 手写键盘
-                var keyBeans: MutableList<SoftKey> = LinkedList()
-                val keys = KeyboardData.layoutHandwritingCn[skbStyleMode]!!
-                var handwritingKey = createHandwritingKey(keys[0][0]) // 符号站位
-                handwritingKey.mLeftF = 0.815f
-                handwritingKey.heightF = 0.50f
-                keyBeans.add(handwritingKey)
+            InputModeSwitcher.MASK_SKB_LAYOUT_HANDWRITING -> {// 3000 手写键盘：上半部分整块手写区，下面一行标点+删除，最后一行功能键
+                val keyBeans: MutableList<SoftKey> = LinkedList()
+                val rowHeight = 0.18f // 按键行比普通键盘(0.25)矮，留更多手写区
+                val punctuations = arrayOf("，", "。", "？", "！", "、", "……")
+                punctuations.forEachIndexed { index, symbol ->
+                    keyBeans.add(SoftKey(label = symbol).apply {
+                        widthF = 0.11f
+                        heightF = rowHeight
+                        if (index == 0) {
+                            mLeftF = 0.005f
+                            // 两行按键贴底；数字行开启时整体按1.2缩放
+                            mTopF = (if (numberLine) 1.2f else 1f) - rowHeight * 2
+                        }
+                    })
+                }
+                // 全屏/半屏切换键（文字由 TextKeyboard 按当前开关动态显示）
+                keyBeans.add(SoftKey(code = InputModeSwitcher.USER_KEYCODE_HW_FULL_SCREEN, label = "全屏").apply {
+                    widthF = 0.12f
+                    heightF = rowHeight
+                })
+                keyBeans.add(createHandwritingKey(KeyEvent.KEYCODE_DEL).apply {
+                    widthF = 0.21f
+                    heightF = rowHeight
+                })
                 rows.add(keyBeans)
-                keyBeans = LinkedList()
-                handwritingKey = createHandwritingKey(keys[1][0])
-                handwritingKey.mLeftF = 0.815f
-                keyBeans.add(handwritingKey)
-                rows.add(keyBeans)
-                keyBeans = lastRows(skbValue)
-                rows.add(keyBeans)
+                rows.add(lastRows(skbValue).onEach { it.heightF = rowHeight })
             }
             InputModeSwitcher.MASK_SKB_LAYOUT_QWERTY_ABC -> {// 4000 英文全键
                 var keyBeans: MutableList<SoftKey> = LinkedList()

@@ -86,6 +86,8 @@ object InputModeSwitcher {
     const val USER_KEYCODE_PASTE = -22
     const val USER_KEYCODE_MOVE_START = -23
     const val USER_KEYCODE_MOVE_END = -24
+    /** 手写键盘：全屏/半屏手写切换 */
+    const val USER_KEYCODE_HW_FULL_SCREEN = -30
 
 
     /**
