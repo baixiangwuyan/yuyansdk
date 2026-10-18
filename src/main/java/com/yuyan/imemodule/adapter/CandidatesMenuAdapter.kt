@@ -108,6 +108,7 @@ class CandidatesMenuAdapter(context: Context?) : RecyclerView.Adapter<Candidates
             SkbMenuMode.PinyinStroke -> rimeValue == CustomConstant.SCHEMA_ZH_STROKE
             SkbMenuMode.LockClipBoard -> CustomConstant.lockClipBoardEnable
             SkbMenuMode.TextEdit -> InputModeSwitcher.isTextEditSkb
+            SkbMenuMode.VoiceInput -> KeyboardManager.instance.currentContainer is com.yuyan.imemodule.keyboard.container.VoiceContainer
             else -> false
         }
         return result

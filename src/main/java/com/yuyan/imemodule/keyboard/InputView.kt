@@ -1,6 +1,5 @@
 package com.yuyan.imemodule.keyboard
 
-import com.yuyan.imemodule.utils.clipboardManager
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
@@ -623,13 +622,6 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
 
         override fun onClickClearClipBoard() {
             DataBaseKT.instance.clipboardDao().deleteAll()  // 花花：置顶的也一起清
-            // 花花：连系统剪贴板一起清空（ROM 自带的剪贴板历史不归输入法管，清不到）
-            runCatching {
-                val cm = context.clipboardManager
-                if (android.os.Build.VERSION.SDK_INT >= 28) cm.clearPrimaryClip()
-                else cm.setPrimaryClip(android.content.ClipData.newPlainText("", ""))
-            }
-            getInstance().internal.clipboardUpdateContent.setValue("")
             (KeyboardManager.instance.currentContainer as? ClipBoardContainer)?.showClipBoardView(SkbMenuMode.ClipBoard)
         }
     }
@@ -664,6 +656,12 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
     }
 
     fun requestHideSelf() = service.requestHideSelf(0)
+
+    /** 花花：语音输入结果上屏 */
+    fun commitVoiceText(text: String) { if (text.isNotEmpty()) commitText(text) }
+
+    /** 花花：语音面板上的退格 */
+    fun voiceBackspace() = sendKeyEvent(KeyEvent.KEYCODE_DEL)
 
     private fun sendKeyEvent(keyCode: Int) {
         if (isAddPhrases) {

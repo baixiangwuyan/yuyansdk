@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- 花花：离线语音输入需要录音（不联网，无 INTERNET 权限） -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <queries>
         <intent>
             <action android:name="android.intent.action.GET_CONTENT"/>
@@ -35,6 +37,13 @@
             android:configChanges="orientation|screenSize"
             android:exported="false"
             android:label="@string/edit_theme" />
+        <!-- 花花：申请麦克风权限用的透明页 -->
+        <activity
+            android:name=".voice.VoicePermissionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity
             android:name=".libs.cropper.CropImageActivity"
             android:exported="false"

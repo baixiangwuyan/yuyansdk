@@ -20,7 +20,7 @@ import com.yuyan.imemodule.prefs.behavior.SkbMenuMode
 import com.yuyan.imemodule.utils.thread.ThreadPoolUtils
 
 //@Database(entities = [SideSymbol::class, Clipboard::class, UsedSymbol::class], version = 1, exportSchema = false)
-@Database(entities = [SideSymbol::class, Clipboard::class, UsedSymbol::class, Phrase::class, SkbFun::class], version = 4, exportSchema = false)
+@Database(entities = [SideSymbol::class, Clipboard::class, UsedSymbol::class, Phrase::class, SkbFun::class], version = 5, exportSchema = false)
 abstract class DataBaseKT : RoomDatabase() {
     abstract fun sideSymbolDao(): SideSymbolDao
     abstract fun clipboardDao(): ClipboardDao
@@ -48,11 +48,19 @@ abstract class DataBaseKT : RoomDatabase() {
             }
         }
 
+        // 花花：键盘菜单加“语音输入”（排在最后；可在“定制工具栏”里放到候选栏）
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("INSERT OR IGNORE INTO skbfun (name, isKeep, position) SELECT 'VoiceInput', 0, IFNULL(MAX(position), -1) + 1 FROM skbfun WHERE isKeep = 0")
+            }
+        }
+
         val instance = Room.databaseBuilder(Launcher.instance.context, DataBaseKT::class.java, "ime_db")
             .allowMainThreadQueries()
             .addMigrations(MIGRATION_1_2)
             .addMigrations(MIGRATION_2_3)
             .addMigrations(MIGRATION_3_4)
+            .addMigrations(MIGRATION_4_5)
             .addCallback(object :Callback(){
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)
@@ -112,6 +120,7 @@ abstract class DataBaseKT : RoomDatabase() {
                     SkbFun(name = SkbMenuMode.Custom.name, isKeep = 0, position = 13),
                     SkbFun(name = SkbMenuMode.Settings.name, isKeep = 0, position = 14),
                     SkbFun(name = SkbMenuMode.TextEdit.name, isKeep = 0, position = 15),
+                    SkbFun(name = SkbMenuMode.VoiceInput.name, isKeep = 0, position = 16),
                 )
                 instance.skbFunDao().insertAll(skbFuns)
             }

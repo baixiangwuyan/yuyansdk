@@ -7,6 +7,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.os.Bundle
+import android.content.ClipData
+import android.content.Intent
+import android.net.Uri
+import com.yuyan.imemodule.utils.clipboardManager
+import com.yuyan.imemodule.voice.AsrModelRegistry
+import com.yuyan.imemodule.voice.VoiceModelManager
+import com.yuyan.imemodule.voice.VoicePermissionActivity
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +51,7 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
     private lateinit var exportLauncher: ActivityResultLauncher<String>
     private lateinit var importLauncher: ActivityResultLauncher<String>
     private lateinit var gramLauncher: ActivityResultLauncher<String>
+    private lateinit var voiceLauncher: ActivityResultLauncher<String>
 
     override fun onStart() {
         super.onStart()
@@ -124,6 +132,26 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
                     }
                 }
             }
+        // 花花：导入离线语音模型（直接选浏览器下载的 .tar.bz2 压缩包，不用解压）
+        voiceLauncher =
+            registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+                if (uri == null) return@registerForActivityResult
+                val ctx = requireContext()
+                lifecycleScope.withLoadingDialog(ctx) {
+                    val name = withContext(Dispatchers.IO) { ctx.contentResolver.queryFileName(uri) }
+                    val err = withContext(NonCancellable + Dispatchers.IO) {
+                        VoiceModelManager.import(ctx, uri, name)
+                    }
+                    if (err != null) {
+                        AlertDialog.Builder(ctx).setTitle("导入语音模型失败").setMessage(err)
+                            .setPositiveButton(android.R.string.ok, null).show()
+                    } else {
+                        Toast.makeText(ctx, "语音模型已导入：${VoiceModelManager.currentModelName()}", Toast.LENGTH_LONG).show()
+                        if (!VoicePermissionActivity.hasPermission(ctx)) VoicePermissionActivity.request(ctx)
+                        refreshScreen()
+                    }
+                }
+            }
         exportLauncher =
             registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
                 if (uri == null) return@registerForActivityResult
@@ -141,6 +169,58 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
             }
     }
 
+    private fun refreshScreen() {
+        onCreatePreferences(null, null)  // 重建整页，刷新“已导入/未导入”状态
+    }
+
+    /** 花花：离线语音（导入/删除模型、下载地址） */
+    private fun addVoicePreferences(screen: PreferenceScreen) {
+        val ctx = requireContext()
+        val name = VoiceModelManager.currentModelName()
+        val summary = if (name != null) "已导入：%s（%.0f MB）".format(name, VoiceModelManager.modelSizeBytes() / 1048576.0)
+            else "未导入。先用“下载语音模型”下载 .tar.bz2 压缩包，再在这里选它（不用解压）"
+        screen.addPreference("导入语音模型", summary) {
+            voiceLauncher.launch("*/*")
+        }
+        screen.addPreference("下载语音模型", "用浏览器下载（约 134MB，建议连 Wi-Fi）。推荐第一个：中英文、自动加标点") {
+            val profiles = AsrModelRegistry.profiles
+            val items = profiles.mapIndexed { i, p ->
+                (if (i == 0) "【推荐】" else "") + p.name + "（" + p.size + "）\n" + p.description
+            }.toTypedArray()
+            AlertDialog.Builder(ctx)
+                .setTitle("选择要下载的语音模型")
+                .setItems(items) { _, which ->
+                    val p = profiles[which]
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(p.downloadUrl)))
+                    } catch (e: Exception) {
+                        ctx.clipboardManager.setPrimaryClip(ClipData.newPlainText("url", p.downloadUrl))
+                        Toast.makeText(ctx, "没有找到浏览器，下载地址已复制", Toast.LENGTH_LONG).show()
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+        if (name != null) {
+            screen.addPreference("删除语音模型", "释放约 170MB 空间，语音输入将不可用") {
+                AlertDialog.Builder(ctx)
+                    .setTitle("删除语音模型")
+                    .setMessage("确定删除已导入的语音模型吗？")
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        VoiceModelManager.delete()
+                        refreshScreen()
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+        }
+        if (name != null && !VoicePermissionActivity.hasPermission(ctx)) {
+            screen.addPreference("允许使用麦克风", "语音输入需要麦克风权限（只在本机识别，不联网）") {
+                VoicePermissionActivity.request(ctx)
+            }
+        }
+    }
+
     override fun onPreferenceUiCreated(screen: PreferenceScreen) {
         val ctx = requireContext()
         screen.addPreference(R.string.export_user_data) {
@@ -148,6 +228,17 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
                 exportTimestamp = System.currentTimeMillis()
                 exportLauncher.launch("yuyanIme_${TimeUtils.iso8601UTCDateTime(exportTimestamp)}.zip")
             }
+        }
+        screen.addPreference(R.string.import_user_data) {
+            AlertDialog.Builder(ctx)
+                .setIconAttribute(android.R.attr.alertDialogIcon)
+                .setTitle(R.string.import_user_data)
+                .setMessage(R.string.confirm_import_user_data)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    importLauncher.launch("application/zip")
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
         val gramFile = java.io.File(CustomConstant.RIME_DICT_PATH, GRAM_FILE)
         val gramSummary = if (gramFile.exists()) "已导入（%.1f MB），整句候选更准".format(gramFile.length() / 1048576.0)
@@ -169,16 +260,6 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
                     .show()
             }
         }
-        screen.addPreference(R.string.import_user_data) {
-            AlertDialog.Builder(ctx)
-                .setIconAttribute(android.R.attr.alertDialogIcon)
-                .setTitle(R.string.import_user_data)
-                .setMessage(R.string.confirm_import_user_data)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    importLauncher.launch("application/zip")
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
-        }
+        addVoicePreferences(screen)
     }
 }

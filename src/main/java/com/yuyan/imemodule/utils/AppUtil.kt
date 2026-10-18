@@ -46,6 +46,10 @@ object AppUtil {
         launchMainToDest(context, R.id.handwritingSettingsFragment)
 
 
+    /** 花花：打开 设置 → 其他（导入语音/语法模型） */
+    fun launchSettingsToOther(context: Context) =
+        launchMainToDest(context, R.id.otherSettingsFragment)
+
     fun launchSettingsToKeyboard(context: Context) =
         launchMainToDest(context, R.id.keyboardFeedbackFragment)
 

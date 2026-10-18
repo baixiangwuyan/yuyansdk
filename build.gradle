@@ -71,7 +71,10 @@ android {
     }
     sourceSets {
         offline {
-            jniLibs.srcDirs = ['libs']
+            // 花花：libonnxruntime.so（离线语音用，28MB，超过 GitHub 网页上传 25MB 限制）不进仓库，
+            // 构建时由 fetchOnnxRuntime 从 Maven Central 下载官方 AAR 解出；
+            // 如果手动把它放进了 libs/arm64-v8a/，就直接用那份。
+            jniLibs.srcDirs = file('libs/arm64-v8a/libonnxruntime.so').exists() ? ['libs'] : ['libs', "$buildDir/huahua-ort/jniLibs"]
         }
     }
 
@@ -106,6 +109,53 @@ dependencies {
     ksp "androidx.room:room-compiler:2.6.1"
     implementation "androidx.room:room-ktx:2.6.1"
 }
+
+// 花花：下载 onnxruntime-android（与 Xime 同版本），只取 arm64-v8a 的 libonnxruntime.so，校验 SHA-256
+def huahuaOrtVersion = '1.28.0'
+def huahuaOrtSha256 = 'f351a0638696f54b35184290dbc001d66daae17281ad0b548d2c70347d53b8a9'
+tasks.register('fetchOnnxRuntime') {
+    def outSo = file("$buildDir/huahua-ort/jniLibs/arm64-v8a/libonnxruntime.so")
+    def manual = file('libs/arm64-v8a/libonnxruntime.so')
+    outputs.file(outSo)
+    onlyIf { !manual.exists() }
+    doLast {
+        if (outSo.exists() && outSo.length() > 1000000) return
+        def aar = file("$buildDir/huahua-ort/onnxruntime-android-${huahuaOrtVersion}.aar")
+        aar.parentFile.mkdirs()
+        def sha = { File f ->
+            def md = java.security.MessageDigest.getInstance('SHA-256')
+            f.withInputStream { is -> byte[] b = new byte[65536]; int n; while ((n = is.read(b)) > 0) md.update(b, 0, n) }
+            md.digest().collect { String.format('%02x', it) }.join()
+        }
+        def path = "com/microsoft/onnxruntime/onnxruntime-android/${huahuaOrtVersion}/onnxruntime-android-${huahuaOrtVersion}.aar"
+        def urls = ["https://repo1.maven.org/maven2/$path", "https://maven.aliyun.com/repository/central/$path"]
+        boolean ok = aar.exists() && sha(aar) == huahuaOrtSha256
+        for (int attempt = 0; attempt < 3 && !ok; attempt++) {
+            for (u in urls) {
+                try {
+                    println "下载 onnxruntime: $u"
+                    def conn = new URL(u).openConnection()
+                    conn.connectTimeout = 30000
+                    conn.readTimeout = 120000
+                    conn.inputStream.withStream { is -> aar.withOutputStream { os -> os << is } }
+                    if (sha(aar) == huahuaOrtSha256) { ok = true; break }
+                    println "SHA-256 不匹配，重试"
+                } catch (Exception e) {
+                    println "下载失败：${e.message}"
+                }
+            }
+        }
+        if (!ok) throw new GradleException("onnxruntime-android ${huahuaOrtVersion} 下载失败")
+        copy {
+            from(zipTree(aar)) { include 'jni/arm64-v8a/libonnxruntime.so' }
+            into("$buildDir/huahua-ort/tmp")
+        }
+        outSo.parentFile.mkdirs()
+        file("$buildDir/huahua-ort/tmp/jni/arm64-v8a/libonnxruntime.so").renameTo(outSo)
+        if (!outSo.exists()) throw new GradleException('AAR 里没有 jni/arm64-v8a/libonnxruntime.so')
+    }
+}
+preBuild.dependsOn fetchOnnxRuntime
 
 tasks.register('makeaar', Copy) {
     from('build/outputs/aar/')

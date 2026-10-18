@@ -1,0 +1,196 @@
+package com.yuyan.imemodule.keyboard.container
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.os.SystemClock
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import com.yuyan.imemodule.R
+import com.yuyan.imemodule.data.theme.ThemeManager.activeTheme
+import com.yuyan.imemodule.keyboard.InputView
+import com.yuyan.imemodule.keyboard.KeyboardManager
+import com.yuyan.imemodule.utils.AppUtil
+import com.yuyan.imemodule.utils.DevicesUtils
+import com.yuyan.imemodule.voice.AsrNative
+import com.yuyan.imemodule.voice.VoiceModelManager
+import com.yuyan.imemodule.voice.VoicePermissionActivity
+import com.yuyan.imemodule.voice.VoiceRecognizer
+import splitties.dimensions.dp
+
+/**
+ * 花花：语音输入面板（替换键盘区域显示）。
+ *
+ * 点一下麦克风开始说，再点一下结束并上屏；也可以按住说话、松开上屏。
+ * 说话时上方实时显示识别中的文字。左下“键盘”返回打字，右下“退格”删字。
+ */
+@SuppressLint("ViewConstructor", "ClickableViewAccessibility")
+class VoiceContainer(context: Context, inputView: InputView) : BaseContainer(context, inputView) {
+
+    private val statusView = TextView(context)
+    private val micView = ImageView(context)
+    private val micBg = GradientDrawable().apply { shape = GradientDrawable.OVAL }
+    private var panelActive = false
+    private var pressStartedSession = false
+    private var pressDownAt = 0L
+
+    private val listener = object : VoiceRecognizer.Listener {
+        override fun onState(state: VoiceRecognizer.State, message: String?) {
+            when (state) {
+                VoiceRecognizer.State.LOADING -> setStatus("正在加载语音模型…", false)
+                VoiceRecognizer.State.LISTENING -> setStatus("请说话…（再点一下结束）", true)
+                VoiceRecognizer.State.IDLE -> if (!VoiceRecognizer.isRecording) setIdle()
+                VoiceRecognizer.State.ERROR -> setStatus(message ?: "语音识别出错", false)
+            }
+        }
+
+        override fun onPartial(text: String) {
+            if (text.isNotEmpty()) statusView.text = text
+        }
+
+        override fun onFinal(text: String) {
+            if (text.isNotEmpty()) inputView.commitVoiceText(text)
+            else statusView.text = "没有听清，请再说一次"
+        }
+    }
+
+    init {
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        }
+        statusView.apply {
+            gravity = Gravity.CENTER
+            setTextColor(activeTheme.keyTextColor)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            maxLines = 4
+        }
+        root.addView(statusView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val back = sideButton(R.drawable.ic_menu_keyboard, "返回键盘") {
+            VoiceRecognizer.cancel()
+            KeyboardManager.instance.switchKeyboard()
+        }
+        val del = sideButton(R.drawable.sdk_skb_key_delete_icon, "退格") {
+            DevicesUtils.tryVibrate(this)
+            inputView.voiceBackspace()
+        }
+        micView.apply {
+            setImageResource(R.drawable.ic_menu_voice)
+            setColorFilter(Color.WHITE)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = micBg
+            contentDescription = "语音输入"
+            setOnTouchListener { _, e -> onMicTouch(e) }
+        }
+        row.addView(back, LinearLayout.LayoutParams(0, dp(56), 1f))
+        row.addView(micView, LinearLayout.LayoutParams(dp(76), dp(76)))
+        row.addView(del, LinearLayout.LayoutParams(0, dp(56), 1f))
+        root.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(16)
+        })
+        addView(root)
+        setMicColor(false)
+    }
+
+    private fun sideButton(icon: Int, desc: String, onClick: () -> Unit) = ImageView(context).apply {
+        setImageResource(icon)
+        setColorFilter(activeTheme.keyTextColor)
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
+        contentDescription = desc
+        setOnClickListener { onClick() }
+    }
+
+    /** 打开面板时调用 */
+    fun showPanel() {
+        panelActive = true
+        setIdle()
+    }
+
+    private fun setIdle() {
+        when {
+            !AsrNative.available -> setStatus("当前设备不支持离线语音（需要 64 位 arm64 手机）", false)
+            !VoiceModelManager.isReady() -> setStatus("还没有导入语音模型\n点麦克风去 设置 → 其他 → 导入语音模型", false)
+            !VoicePermissionActivity.hasPermission(context) -> setStatus("需要麦克风权限\n点麦克风去允许", false)
+            else -> setStatus("点一下麦克风开始说话\n（也可以按住说、松开上屏）", false)
+        }
+    }
+
+    private fun setStatus(text: String, listening: Boolean) {
+        statusView.text = text
+        setMicColor(listening)
+    }
+
+    private fun setMicColor(listening: Boolean) {
+        micBg.setColor(if (listening) Color.parseColor("#E53935") else activeTheme.accentKeyBackgroundColor)
+    }
+
+    private fun onMicTouch(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                DevicesUtils.tryVibrate(this)
+                pressDownAt = SystemClock.uptimeMillis()
+                pressStartedSession = false
+                if (VoiceRecognizer.isRecording) {
+                    VoiceRecognizer.stop()          // 正在说 → 点一下结束
+                } else if (prepare()) {
+                    VoiceRecognizer.start(listener)
+                    pressStartedSession = true
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                // 按住超过 0.6 秒再松开 = “按住说话”，松开即结束
+                if (pressStartedSession && SystemClock.uptimeMillis() - pressDownAt > 600) {
+                    VoiceRecognizer.stop()
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> if (pressStartedSession) VoiceRecognizer.stop()
+        }
+        return true
+    }
+
+    /** 检查模型和权限；缺什么就引导去补，返回能否开始 */
+    private fun prepare(): Boolean {
+        if (!AsrNative.available) {
+            setIdle()
+            return false
+        }
+        if (!VoiceModelManager.isReady()) {
+            AppUtil.launchSettingsToOther(context)
+            return false
+        }
+        if (!VoicePermissionActivity.hasPermission(context)) {
+            VoicePermissionActivity.request(context)
+            return false
+        }
+        return true
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (panelActive && !isShown) {
+            panelActive = false
+            VoiceRecognizer.onPanelHidden()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        if (panelActive) {
+            panelActive = false
+            VoiceRecognizer.onPanelHidden()
+        }
+    }
+}

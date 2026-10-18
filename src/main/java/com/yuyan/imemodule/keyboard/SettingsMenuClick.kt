@@ -15,6 +15,7 @@ import com.yuyan.imemodule.keyboard.container.CandidatesContainer
 import com.yuyan.imemodule.keyboard.container.ClipBoardContainer
 import com.yuyan.imemodule.keyboard.container.SettingsContainer
 import com.yuyan.imemodule.keyboard.container.SymbolContainer
+import com.yuyan.imemodule.keyboard.container.VoiceContainer
 import com.yuyan.imemodule.service.InputDispatcher
 
 fun onSettingsMenuClick(inputView: InputView, skbMenuMode: SkbMenuMode) {
@@ -139,6 +140,16 @@ fun onSettingsMenuClick(inputView: InputView, skbMenuMode: SkbMenuMode) {
         }
         SkbMenuMode.LockClipBoard -> {
             CustomConstant.lockClipBoardEnable = !CustomConstant.lockClipBoardEnable
+        }
+        SkbMenuMode.VoiceInput -> {  // 花花：离线语音输入
+            if (KeyboardManager.instance.currentContainer is VoiceContainer) {
+                KeyboardManager.instance.switchKeyboard()
+            } else {
+                inputView.resetToIdleState()
+                KeyboardManager.instance.switchKeyboard(KeyboardManager.KeyboardType.VOICE)
+                (KeyboardManager.instance.currentContainer as? VoiceContainer)?.showPanel()
+                inputView.updateCandidateBar()
+            }
         }
         SkbMenuMode.TextEdit -> {
             InputModeSwitcher.switchModeForUserKey(
