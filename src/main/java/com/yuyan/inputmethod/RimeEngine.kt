@@ -116,7 +116,7 @@ object RimeEngine {
         val word = showCandidates.getOrNull(indexReal)?.text ?: ""
         // 列表顺序被重排过，按词找回它在 Rime 联想里的位置；不是 Rime 的词就不通知 Rime
         val rimeIndex = rimeAssoc.indexOf(word)
-        if (rimeIndex >= 0) Rime.chooseAssociate(rimeIndex)
+        Rime.chooseAssociate(rimeIndex)  // 非 Rime 联想词传 -1：只用来打断连续造词
         updateCandidatesOrCommitText()
         preCommitText = word
     }
