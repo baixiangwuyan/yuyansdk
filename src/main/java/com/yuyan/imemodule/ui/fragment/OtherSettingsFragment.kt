@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.PreferenceScreen
 import com.yuyan.imemodule.R
+import com.yuyan.imemodule.application.CustomConstant
 import com.yuyan.imemodule.application.Launcher
 import com.yuyan.imemodule.manager.UserDataManager
 import com.yuyan.imemodule.prefs.AppPrefs
@@ -35,11 +36,14 @@ private val switchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _,
     Launcher.instance.context.packageManager.setComponentEnabledSetting(componentName, if(value) PackageManager.COMPONENT_ENABLED_STATE_DISABLED else PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
 }
 
+private const val GRAM_FILE = "huahua.gram"
+
 class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().other){
 
     private var exportTimestamp = System.currentTimeMillis()
     private lateinit var exportLauncher: ActivityResultLauncher<String>
     private lateinit var importLauncher: ActivityResultLauncher<String>
+    private lateinit var gramLauncher: ActivityResultLauncher<String>
 
     override fun onStart() {
         super.onStart()
@@ -82,6 +86,44 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
                     }
                 }
             }
+        // 花花：导入语法模型（.gram），放到 Rime 用户目录 huahua.gram，重启后生效
+        gramLauncher =
+            registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+                if (uri == null) return@registerForActivityResult
+                val ctx = requireContext()
+                val cr = ctx.contentResolver
+                lifecycleScope.withLoadingDialog(ctx) {
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        val name = cr.queryFileName(uri) ?: return@withContext
+                        if (!name.endsWith(".gram", ignoreCase = true)) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(ctx, "请选择 .gram 语法模型文件", Toast.LENGTH_LONG).show()
+                            }
+                            return@withContext
+                        }
+                        try {
+                            val target = java.io.File(CustomConstant.RIME_DICT_PATH, GRAM_FILE)
+                            val tmp = java.io.File(CustomConstant.RIME_DICT_PATH, "$GRAM_FILE.tmp")
+                            cr.openInputStream(uri)!!.use { input ->
+                                tmp.outputStream().use { input.copyTo(it) }
+                            }
+                            if (!tmp.renameTo(target)) {
+                                tmp.copyTo(target, overwrite = true); tmp.delete()
+                            }
+                            lifecycleScope.launch(NonCancellable + Dispatchers.Main) {
+                                delay(600L)
+                                AppUtil.exit()
+                            }
+                            withContext(Dispatchers.Main) {
+                                AppUtil.showRestartNotification(ctx)
+                                Toast.makeText(ctx, "语法模型已导入，重启后生效", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            ctx.importErrorDialog(e)
+                        }
+                    }
+                }
+            }
         exportLauncher =
             registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
                 if (uri == null) return@registerForActivityResult
@@ -105,6 +147,26 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
             lifecycleScope.launch {
                 exportTimestamp = System.currentTimeMillis()
                 exportLauncher.launch("yuyanIme_${TimeUtils.iso8601UTCDateTime(exportTimestamp)}.zip")
+            }
+        }
+        val gramFile = java.io.File(CustomConstant.RIME_DICT_PATH, GRAM_FILE)
+        val gramSummary = if (gramFile.exists()) "已导入（%.1f MB），整句候选更准".format(gramFile.length() / 1048576.0)
+            else "未导入。导入 .gram 文件后，拼音候选和整句排序更聪明"
+        screen.addPreference("导入语法模型", gramSummary) {
+            gramLauncher.launch("*/*")
+        }
+        if (gramFile.exists()) {
+            screen.addPreference("删除语法模型", "释放空间，恢复为普通词频排序") {
+                AlertDialog.Builder(ctx)
+                    .setTitle("删除语法模型")
+                    .setMessage("删除后需要重启输入法，继续吗？")
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        gramFile.delete()
+                        AppUtil.showRestartNotification(ctx)
+                        lifecycleScope.launch { delay(400L); AppUtil.exit() }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
             }
         }
         screen.addPreference(R.string.import_user_data) {

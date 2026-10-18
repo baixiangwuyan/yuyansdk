@@ -23,7 +23,7 @@ class Rime(fullCheck: Boolean) {
         }
 
         init {
-            System.loadLibrary("yuyanime")
+            System.loadLibrary("huahuarime")  // 花花：开源 librime + octagram + lua
         }
 
         fun startup(context: Context, fullCheck: Boolean) {

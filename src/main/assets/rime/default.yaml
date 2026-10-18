@@ -1,0 +1,14 @@
+# 花花输入法
+config_version: "huahua.1"
+schema_list:
+  - schema: t9_pinyin
+  - schema: pinyin
+  - schema: double_pinyin_natural
+  - schema: double_pinyin_mspy
+  - schema: double_pinyin_sogou
+  - schema: double_pinyin_flypy
+  - schema: double_pinyin_abc
+  - schema: double_pinyin_ziguang
+  - schema: english
+menu:
+  page_size: 100

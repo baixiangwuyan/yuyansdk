@@ -35,7 +35,7 @@ object UserDataManager {
         dest.putNextEntry(ZipEntry("$destPrefix/"))
         srcDir.walkTopDown().forEach { f ->
             val related = f.relativeTo(srcDir)
-            if (related.path != "") {
+            if (related.path != "" && !skipInBackup(destPrefix, related)) {
                 if (f.isDirectory) {
                     dest.putNextEntry(ZipEntry("$destPrefix/${related.path}/"))
                 } else if (f.isFile) {
@@ -44,6 +44,14 @@ object UserDataManager {
                 }
             }
         }
+    }
+
+    /** 花花：备份不含词库编译产物（rime/build，可由安装包重建）和模型文件（体积大，单独导入） */
+    private fun skipInBackup(destPrefix: String, related: File): Boolean {
+        if (destPrefix != "external") return false
+        val path = related.invariantSeparatorsPath
+        return path == "rime/build" || path.startsWith("rime/build/") ||
+            path.endsWith(".gram") || path == "models" || path.startsWith("models/")
     }
 
     private val sharedPrefsDir = File(Launcher.instance.context.applicationInfo.dataDir, "shared_prefs")
