@@ -261,6 +261,30 @@ object InputModeSwitcher {
     }
 
     /**
+     * 花花：乱序17、笔画已去除。旧设置里记着这两种的，统一切回中文9键。
+     */
+    private fun isRemovedLayout(mode: Int): Boolean {
+        val layout = mode and MASK_SKB_LAYOUT
+        return layout == MASK_SKB_LAYOUT_LX17 || layout == MASK_SKB_LAYOUT_STROKE
+    }
+
+    private fun migrateRemovedLayout(mode: Int): Int {
+        val internal = getInstance().internal
+        val rime = internal.pinyinModeRime.getValue()
+        if (rime == CustomConstant.SCHEMA_ZH_STROKE || rime == CustomConstant.SCHEMA_ZH_DOUBLE_LX17) {
+            internal.pinyinModeRime.setValue(CustomConstant.SCHEMA_ZH_T9)
+        }
+        if (isRemovedLayout(internal.inputMethodPinyinMode.getValue())) {
+            internal.inputMethodPinyinMode.setValue(MODE_T9_CHINESE)
+        }
+        if (isRemovedLayout(internal.inputDefaultMode.getValue())) {
+            internal.inputDefaultMode.setValue(MODE_T9_CHINESE)
+        }
+        if (isRemovedLayout(mRecentLauageInputMode)) mRecentLauageInputMode = MODE_T9_CHINESE
+        return if (isRemovedLayout(mode)) MODE_T9_CHINESE else mode
+    }
+
+    /**
      * 通过应用内设置，切换输入法模式。
      */
     fun switchModeForSetting(value: Pair<Int, String>) {
@@ -335,7 +359,7 @@ object InputModeSwitcher {
      * 保存新的输入法模式
      */
     fun saveInputMode(newInputMode: Int) {
-        mInputMode = newInputMode // 设置新的输入法模式为当前的输入法模式
+        mInputMode = migrateRemovedLayout(newInputMode) // 设置新的输入法模式为当前的输入法模式
         if (isEnglish) {
             InputDispatcher.initImeSchema(CustomConstant.SCHEMA_EN)
         } else {

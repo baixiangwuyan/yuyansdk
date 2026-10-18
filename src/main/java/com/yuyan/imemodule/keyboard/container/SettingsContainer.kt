@@ -166,20 +166,8 @@ class SettingsContainer(context: Context, inputView: InputView) : BaseContainer(
                 SkbMenuMode.Pinyin26Double
             )
         )
-        funItems.add(
-            SkbFunItem(
-                mContext.getString(R.string.keyboard_name_pinyin_lx_17),
-                R.drawable.selece_input_mode_lx17,
-                SkbMenuMode.PinyinLx17
-            )
-        )
-        funItems.add(
-            SkbFunItem(
-                mContext.getString(R.string.keyboard_name_stroke),
-                R.drawable.selece_input_mode_stroke,
-                SkbMenuMode.PinyinStroke
-            )
-        )
+        // 花花：已去除乱序17键盘
+        // 花花：已去除笔画键盘
         val adapter = MenuAdapter(context, funItems)
         adapter.setOnItemClickLitener { _: RecyclerView.Adapter<*>?, _: View?, position: Int ->
             onKeyboardMenuClick(funItems[position])

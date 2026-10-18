@@ -44,6 +44,10 @@ class Launcher {
                 copyFileOrDir(context, "hw", "", CustomConstant.HW_DICT_PATH, true)
                 AppPrefs.getInstance().internal.dataDictVersion.setValue(CustomConstant.CURRENT_RIME_DICT_DATA_VERSIOM)
             }
+            // 花花：删除已去除的笔画、乱序17词库，释放空间
+            listOf("stroke.prism.bin", "stroke.table.bin", "stroke.reverse.bin", "double_pinyin_ls17.prism.bin").forEach {
+                runCatching { java.io.File(CustomConstant.RIME_DICT_PATH, "build/$it").delete() }
+            }
             InputDispatcher.resetIme()  // 解决词库复制慢，导致先调用初始化问题
             YuyanEmojiCompat.init(context)
             //初始化键盘主题
