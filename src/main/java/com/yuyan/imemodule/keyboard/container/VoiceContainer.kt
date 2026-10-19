@@ -12,12 +12,14 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import com.yuyan.imemodule.R
 import com.yuyan.imemodule.data.theme.ThemeManager.activeTheme
 import com.yuyan.imemodule.keyboard.InputView
 import com.yuyan.imemodule.keyboard.KeyboardManager
 import com.yuyan.imemodule.utils.AppUtil
 import com.yuyan.imemodule.utils.DevicesUtils
+import com.yuyan.imemodule.voice.AsrModelKind
 import com.yuyan.imemodule.voice.AsrNative
 import com.yuyan.imemodule.voice.VoiceModelManager
 import com.yuyan.imemodule.voice.VoicePermissionActivity
@@ -29,11 +31,15 @@ import splitties.dimensions.dp
  *
  * 点一下麦克风开始说，再点一下结束并上屏；也可以按住说话、松开上屏。
  * 说话时上方实时显示识别中的文字。左下“键盘”返回打字，右下“退格”删字。
+ * Dolphin 方言模型不是流式的：停顿约 1 秒或点结束后才识别这一句，期间显示“识别中…”。
+ * 导入了多个模型时，右上角的模型名可以点一下切换。
  */
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class VoiceContainer(context: Context, inputView: InputView) : BaseContainer(context, inputView) {
 
     private val statusView = TextView(context)
+    private val modelView = TextView(context)
+    private var keepStatus = false
     private val micView = ImageView(context)
     private val micBg = GradientDrawable().apply { shape = GradientDrawable.OVAL }
     private var panelActive = false
@@ -44,8 +50,17 @@ class VoiceContainer(context: Context, inputView: InputView) : BaseContainer(con
         override fun onState(state: VoiceRecognizer.State, message: String?) {
             when (state) {
                 VoiceRecognizer.State.LOADING -> setStatus("正在加载语音模型…", false)
-                VoiceRecognizer.State.LISTENING -> setStatus("请说话…（再点一下结束）", true)
-                VoiceRecognizer.State.IDLE -> if (!VoiceRecognizer.isRecording) setIdle()
+                VoiceRecognizer.State.LISTENING -> setStatus(
+                    if (activeKind() == AsrModelKind.CTC_DOLPHIN) "请说话…（停顿后自动出字，再点一下结束）"
+                    else "请说话…（再点一下结束）", true)
+                VoiceRecognizer.State.DECODING -> setStatus(message ?: "识别中…", VoiceRecognizer.isRecording)
+                VoiceRecognizer.State.IDLE -> if (!VoiceRecognizer.isRecording) {
+                    when {
+                        message != null -> setStatus(message, false)
+                        keepStatus -> { keepStatus = false; setMicColor(false) }
+                        else -> setIdle()
+                    }
+                }
                 VoiceRecognizer.State.ERROR -> setStatus(message ?: "语音识别出错", false)
             }
         }
@@ -56,7 +71,7 @@ class VoiceContainer(context: Context, inputView: InputView) : BaseContainer(con
 
         override fun onFinal(text: String) {
             if (text.isNotEmpty()) inputView.commitVoiceText(text)
-            else statusView.text = "没有听清，请再说一次"
+            else { statusView.text = "没有听清，请再说一次"; keepStatus = true }
         }
     }
 
@@ -72,6 +87,15 @@ class VoiceContainer(context: Context, inputView: InputView) : BaseContainer(con
             setPadding(dp(16), dp(8), dp(16), dp(8))
             maxLines = 4
         }
+        modelView.apply {
+            gravity = Gravity.END
+            setTextColor(activeTheme.keyTextColor)
+            alpha = 0.7f
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(dp(12), dp(6), dp(12), dp(2))
+            setOnClickListener { switchModel() }
+        }
+        root.addView(modelView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         root.addView(statusView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         val row = LinearLayout(context).apply {
@@ -116,13 +140,39 @@ class VoiceContainer(context: Context, inputView: InputView) : BaseContainer(con
     /** 打开面板时调用 */
     fun showPanel() {
         panelActive = true
+        keepStatus = false
+        updateModelLabel()
         setIdle()
+    }
+
+    private fun activeKind(): AsrModelKind? = VoiceModelManager.activeModel()?.kind
+
+    /** 右上角：当前模型名；导入了两个以上时可点击切换 */
+    private fun updateModelLabel() {
+        val list = if (AsrNative.available) VoiceModelManager.listModels() else emptyList()
+        val cur = VoiceModelManager.activeModel()
+        modelView.visibility = if (cur == null) View.GONE else View.VISIBLE
+        modelView.text = when {
+            cur == null -> ""
+            list.size > 1 -> "模型：${cur.shortName}  ⇄ 切换"
+            else -> "模型：${cur.shortName}"
+        }
+        modelView.isClickable = list.size > 1
+    }
+
+    private fun switchModel() {
+        if (VoiceRecognizer.isRecording || VoiceModelManager.listModels().size < 2) return
+        val next = VoiceModelManager.switchToNext() ?: return
+        updateModelLabel()
+        keepStatus = false
+        setIdle()
+        Toast.makeText(context, "已切换到：${next.name}", Toast.LENGTH_SHORT).show()
     }
 
     private fun setIdle() {
         when {
             !AsrNative.available -> setStatus("当前设备不支持离线语音（需要 64 位 arm64 手机）", false)
-            !VoiceModelManager.isReady() -> setStatus("还没有导入语音模型\n点麦克风去 设置 → 其他 → 导入语音模型", false)
+            !VoiceModelManager.isReady() -> setStatus("还没有导入语音模型\n点麦克风去 设置 → 数据与模型 → 导入语音模型", false)
             !VoicePermissionActivity.hasPermission(context) -> setStatus("需要麦克风权限\n点麦克风去允许", false)
             else -> setStatus("点一下麦克风开始说话\n（也可以按住说、松开上屏）", false)
         }
@@ -146,6 +196,8 @@ class VoiceContainer(context: Context, inputView: InputView) : BaseContainer(con
                 if (VoiceRecognizer.isRecording) {
                     VoiceRecognizer.stop()          // 正在说 → 点一下结束
                 } else if (prepare()) {
+                    panelActive = true
+                    keepStatus = false
                     VoiceRecognizer.start(listener)
                     pressStartedSession = true
                 }
@@ -181,6 +233,15 @@ class VoiceContainer(context: Context, inputView: InputView) : BaseContainer(con
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
         if (panelActive && !isShown) {
+            panelActive = false
+            VoiceRecognizer.onPanelHidden()
+        }
+    }
+
+    /** 收起键盘（输入法窗口隐藏）时也要立刻停麦，否则会在后台一直录音 */
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility != View.VISIBLE && panelActive) {
             panelActive = false
             VoiceRecognizer.onPanelHidden()
         }

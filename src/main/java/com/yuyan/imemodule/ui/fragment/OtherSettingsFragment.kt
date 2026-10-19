@@ -146,7 +146,7 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
                         AlertDialog.Builder(ctx).setTitle("导入语音模型失败").setMessage(err)
                             .setPositiveButton(android.R.string.ok, null).show()
                     } else {
-                        Toast.makeText(ctx, "语音模型已导入：${VoiceModelManager.currentModelName()}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(ctx, "语音模型已导入并设为当前：${VoiceModelManager.currentModelName()}", Toast.LENGTH_LONG).show()
                         if (!VoicePermissionActivity.hasPermission(ctx)) VoicePermissionActivity.request(ctx)
                         refreshScreen()
                     }
@@ -173,19 +173,20 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
         onCreatePreferences(null, null)  // 重建整页，刷新“已导入/未导入”状态
     }
 
-    /** 花花：离线语音（导入/删除模型、下载地址） */
+    /** 花花：离线语音（导入多个模型、选当前用哪个、逐个删除、下载地址） */
     private fun addVoicePreferences(screen: PreferenceScreen) {
         val ctx = requireContext()
-        val name = VoiceModelManager.currentModelName()
-        val summary = if (name != null) "已导入：%s（%.0f MB）".format(name, VoiceModelManager.modelSizeBytes() / 1048576.0)
+        val models = VoiceModelManager.listModels()
+        val active = VoiceModelManager.activeModel()
+        val summary = if (models.isNotEmpty()) "可以导入多个模型并都保留，在下面点选当前用哪个（重复导入同一个会覆盖它）"
             else "未导入。先用“下载语音模型”下载 .tar.bz2 压缩包，再在这里选它（不用解压）"
         screen.addPreference("导入语音模型", summary) {
             voiceLauncher.launch("*/*")
         }
-        screen.addPreference("下载语音模型", "用浏览器下载（约 134MB，建议连 Wi-Fi）。推荐第一个：中英文、自动加标点") {
+        screen.addPreference("下载语音模型", "用浏览器下载（建议连 Wi-Fi）。推荐第一个：中英文、自动加标点；说陕西话等方言选 Dolphin") {
             val profiles = AsrModelRegistry.profiles
             val items = profiles.mapIndexed { i, p ->
-                (if (i == 0) "【推荐】" else "") + p.name + "（" + p.size + "）\n" + p.description
+                (if (i == 0) "【推荐】" else "") + (p.listLabel ?: (p.name + "（" + p.size + "）")) + "\n" + p.description
             }.toTypedArray()
             AlertDialog.Builder(ctx)
                 .setTitle("选择要下载的语音模型")
@@ -201,20 +202,38 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         }
-        if (name != null) {
-            screen.addPreference("删除语音模型", "释放约 170MB 空间，语音输入将不可用") {
+        // 已导入的模型：单选（◉ 当前使用），点开可切换或删除
+        for (m in models) {
+            val isActive = m.id == active?.id
+            val title = (if (isActive) "◉ " else "○ ") + m.name
+            val sum = "%.0f MB · %s".format(m.sizeBytes / 1048576.0,
+                if (isActive) "正在使用（点此可删除）" else "点此切换为当前模型，或删除")
+            screen.addPreference(title, sum) {
+                val actions = if (isActive) arrayOf("删除这个模型") else arrayOf("使用这个模型", "删除这个模型")
                 AlertDialog.Builder(ctx)
-                    .setTitle("删除语音模型")
-                    .setMessage("确定删除已导入的语音模型吗？")
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        VoiceModelManager.delete()
-                        refreshScreen()
+                    .setTitle(m.name)
+                    .setItems(actions) { _, which ->
+                        if (!isActive && which == 0) {
+                            VoiceModelManager.setActive(m.id)
+                            Toast.makeText(ctx, "语音输入改用：${m.name}", Toast.LENGTH_SHORT).show()
+                            refreshScreen()
+                        } else {
+                            AlertDialog.Builder(ctx)
+                                .setTitle("删除语音模型")
+                                .setMessage("确定删除「${m.name}」吗？释放约 %.0f MB。".format(m.sizeBytes / 1048576.0))
+                                .setPositiveButton(android.R.string.ok) { _, _ ->
+                                    VoiceModelManager.delete(m.id)
+                                    refreshScreen()
+                                }
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .show()
+                        }
                     }
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
         }
-        if (name != null && !VoicePermissionActivity.hasPermission(ctx)) {
+        if (models.isNotEmpty() && !VoicePermissionActivity.hasPermission(ctx)) {
             screen.addPreference("允许使用麦克风", "语音输入需要麦克风权限（只在本机识别，不联网）") {
                 VoicePermissionActivity.request(ctx)
             }
