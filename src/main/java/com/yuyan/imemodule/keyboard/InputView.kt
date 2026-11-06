@@ -104,6 +104,8 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
         mFullHandwritingView = FullHandwritingView(context, this)
         addView(mFullHandwritingView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         mSkbCandidatesBarView = mSkbRoot.findViewById(R.id.candidates_bar)
+        // 花花：引擎后台加载完成后，补上加载期间排队的按键并刷新候选
+        com.yuyan.imemodule.service.EngineLoader.addReadyListener { if (!InputDispatcher.isFinish) updateCandidate() }
         mHoderLayoutLeft = mSkbRoot.findViewById(R.id.ll_skb_holder_layout_left)
         mHoderLayoutRight = mSkbRoot.findViewById(R.id.ll_skb_holder_layout_right)
         mInputKeyboardContainer = mSkbRoot.findViewById(R.id.ll_input_keyboard_container)
@@ -517,7 +519,9 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
 
         return when {
             keyCode == KeyEvent.KEYCODE_DEL -> {
-                if (DictDecoder.isCandidatesEmpty || DictDecoder.isAssociate) {
+                if (!com.yuyan.imemodule.service.EngineLoader.ready && com.yuyan.imemodule.service.EngineLoader.hasPendingKeys) {
+                    InputDispatcher.deleteAction()  // 花花：引擎加载中，删的是排队的按键
+                } else if (DictDecoder.isCandidatesEmpty || DictDecoder.isAssociate) {
                     service.getTextBeforeCursor(1).takeIf { it.isNotEmpty() }?.let { textBeforeCursors.push(it) }
                     sendKeyEvent(keyCode)
                 } else {

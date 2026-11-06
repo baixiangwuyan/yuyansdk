@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- 花花：离线语音输入需要录音（不联网，无 INTERNET 权限） -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 花花：开机解锁后预热引擎，第一次点输入框不卡 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <queries>
         <intent>
             <action android:name="android.intent.action.GET_CONTENT"/>
@@ -48,6 +50,14 @@
             android:name=".libs.cropper.CropImageActivity"
             android:exported="false"
             android:theme="@style/Theme.CropActivityTheme"/>
+        <receiver
+            android:name=".service.BootWarmupReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <provider
             android:name=".libs.cropper.CropFileProvider"
             android:authorities="${applicationId}.cropper.fileprovider"

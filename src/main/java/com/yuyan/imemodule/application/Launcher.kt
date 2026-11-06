@@ -27,7 +27,6 @@ class Launcher {
     private fun currentInit() {
         AppPrefs.init(PreferenceManager.getDefaultSharedPreferences(context))
         ThemeManager.init(context.resources.configuration)
-        DataBaseKT.instance.sideSymbolDao().getAllSideSymbolPinyin()  //操作一次查询，提前创建数据库，避免使用时才创建数据库
         ClipboardHelper.init()
     }
 
@@ -36,6 +35,8 @@ class Launcher {
      */
     private fun onInitDataChildThread() {
         ThreadPoolUtils.executeSingleton {
+            // 花花：建库查询挪到后台，不占主线程（冷启动更快弹键盘）
+            runCatching { DataBaseKT.instance.sideSymbolDao().getAllSideSymbolPinyin() }
             // 复制词库文件
             val dataDictVersion = AppPrefs.getInstance().internal.dataDictVersion.getValue()
             if (dataDictVersion < CustomConstant.CURRENT_RIME_DICT_DATA_VERSIOM) {
@@ -48,7 +49,7 @@ class Launcher {
             listOf("stroke.prism.bin", "stroke.table.bin", "stroke.reverse.bin", "double_pinyin_ls17.prism.bin").forEach {
                 runCatching { java.io.File(CustomConstant.RIME_DICT_PATH, "build/$it").delete() }
             }
-            InputDispatcher.resetIme()  // 解决词库复制慢，导致先调用初始化问题
+            InputDispatcher.resetIme()  // 花花：后台加载引擎，完成后主线程补上排队按键
             YuyanEmojiCompat.init(context)
             //初始化键盘主题
             val isFollowSystemDayNight = prefs.followSystemDayNightTheme.getValue()
