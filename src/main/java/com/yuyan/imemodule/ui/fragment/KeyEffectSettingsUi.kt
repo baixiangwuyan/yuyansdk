@@ -72,7 +72,7 @@ class KeyEffectSettingsUi(private val ctx: Context) {
         gapDetails.visibility = if (k.gap.getValue()) View.VISIBLE else View.GONE
 
         root.addView(header("玻璃"))
-        root.addView(switchRow("玻璃效果", "按键变成半透明的毛玻璃，保留原来的颜色；自定义背景图时键里透出模糊的背景", k.glass) { on ->
+        root.addView(switchRow("玻璃效果", "键面保持主题原色（不透明），只在键边加亮边", k.glass) { on ->
             liquidRow.isEnabled = on
             liquidRow.alpha = if (on) 1f else .4f
             liquidDetails.visibility = if (on && k.liquid.getValue()) View.VISIBLE else View.GONE

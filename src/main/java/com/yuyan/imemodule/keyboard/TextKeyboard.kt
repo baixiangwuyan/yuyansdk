@@ -188,7 +188,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             if (!keyEffectsLaidOut) layoutKeyEffects(softKeyboard, keyXMargin, keyYMargin)
             keyEffects.accentColor = mActiveTheme.accentKeyBackgroundColor
             keyEffects.lightKeys = androidx.core.graphics.ColorUtils.calculateLuminance(mActiveTheme.keyBackgroundColor) > 0.5
-            keyEffects.translucentCaps = glass || !isKeyBorder
+            keyEffects.translucentCaps = !isKeyBorder   // 玻璃效果的键面现在不透明，不用再把方框/菱形裁到键缝
             keyEffects.drawUnderKeys(canvas, width, height, mActiveTheme.accentKeyBackgroundColor)
         }
         if (glass) updateBackdrop()
@@ -293,20 +293,21 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             canvas.drawRoundRect(keyCap, radius, radius, capPaint)
             return
         }
+        // 花花：键面不透明，直接用主题原色（换行键保持原本的青绿色，不再被冲淡）；
+        // 立体亮边、阴影、边厚度照旧只叠在边上。键面不透明后毛玻璃底图看不见，不再画。
         val hasImage = frosted.available
-        if (hasImage) frosted.drawFrost(canvas, keyCap, radius)
         val w = keyCap.width(); val h = keyCap.height()
+        capPaint.shader = null
+        capPaint.color = color
+        canvas.drawRoundRect(keyCap, radius, radius, capPaint)
         if (effects.liquid && hasImage) {
+            // 键边折射画在键面上面，按以前半透明键面（有背景图时 0.5）盖过的程度减淡，边上看起来和原来一样。
             val save = canvas.save()
             canvas.translate(keyCap.left, keyCap.top)
-            frosted.drawRefraction(canvas, keyCap.left, keyCap.top, w, h, radius, effects.liquidStrength, resources.displayMetrics.density)
+            frosted.drawRefraction(canvas, keyCap.left, keyCap.top, w, h, radius, effects.liquidStrength,
+                resources.displayMetrics.density, 1f - Color.alpha(color) / 255f * 0.5f)
             canvas.restoreToCount(save)
         }
-        // 保留原来的键色，只是变成半透明：有背景图时透出下面模糊过的图，纯色背景时透出一点底色。
-        val alpha = Color.alpha(color) / 255f * (if (hasImage) 0.5f else 0.72f)
-        capPaint.shader = null
-        capPaint.color = (color and 0x00FFFFFF) or ((alpha * 255).toInt() shl 24)
-        canvas.drawRoundRect(keyCap, radius, radius, capPaint)
         if (effects.liquid) {
             val save = canvas.save()
             canvas.translate(keyCap.left, keyCap.top)

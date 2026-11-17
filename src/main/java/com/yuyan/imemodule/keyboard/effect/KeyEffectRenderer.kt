@@ -23,7 +23,8 @@ import kotlin.random.Random
 
 internal const val KEY_GLOW_DURATION_MS = 500
 internal const val KEY_CAP_DURATION_MS = 235
-internal const val KEY_GLOW_HOLD_ALPHA = 0.5f   // 花花：0.4→0.5，按住时颜色更实
+internal const val KEY_GLOW_HOLD_ALPHA = 0.3f   // 花花：按住时淡淡一层（浅色键；上一版 0.5 太实）
+internal const val KEY_GLOW_HOLD_ALPHA_DARK = 0.22f  // 深色键按住，保证白字看得清
 internal const val KEY_GLOW_RELEASE_MS = 180
 private const val GAP_LIGHT_MAX_PULSES = 6
 
@@ -85,7 +86,7 @@ class KeyEffectRenderer(private val density: Float) {
     private class GlowSquare(val x: Float, val y: Float, val side: Float, val angle: Float, val spin: Float)
 
     private class Press(val key: Int, val start: Long, val scale: Float, val color: Int, val squares: Array<GlowSquare>?) {
-        /** 白键上画小方块用的深一点的同色 */
+        /** 白键上画小方块用的同色（只比底色深一点点，低对比） */
         val deep: Int = deepen(color)
         var releasedAt = -1L
         var halo: RadialGradient? = null
@@ -184,8 +185,9 @@ class KeyEffectRenderer(private val density: Float) {
         val squares = p.squares ?: return
         val time = now()
         val t = ((time - p.start) / p.scale / KEY_GLOW_DURATION_MS).coerceIn(0f, 1f)
-        val hold = if (p.releasedAt < 0) KEY_GLOW_HOLD_ALPHA
-            else KEY_GLOW_HOLD_ALPHA * (1f - (time - p.releasedAt) / (KEY_GLOW_RELEASE_MS * p.scale)).coerceIn(0f, 1f)
+        val holdAlpha = if (lightKeys) KEY_GLOW_HOLD_ALPHA else KEY_GLOW_HOLD_ALPHA_DARK
+        val hold = if (p.releasedAt < 0) holdAlpha
+            else holdAlpha * (1f - (time - p.releasedAt) / (KEY_GLOW_RELEASE_MS * p.scale)).coerceIn(0f, 1f)
         if (t >= 1f && hold <= 0f) return
         val w = cap.width(); val h = cap.height()
         if (w <= 0f || h <= 0f) return
@@ -205,7 +207,7 @@ class KeyEffectRenderer(private val density: Float) {
             // 光晕：只有它用渐变，按下时按键大小建一次。
             if (p.halo == null || p.haloW != w || p.haloH != h) {
                 p.halo = RadialGradient(0f, 0f, max(w, h).coerceAtLeast(1f) * 0.8f,
-                    intArrayOf(withAlpha(p.color, 0.4f), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+                    intArrayOf(withAlpha(p.color, 0.3f), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
                 p.haloW = w; p.haloH = h
             }
             val gx = cap.left + w * 0.5f
@@ -230,13 +232,13 @@ class KeyEffectRenderer(private val density: Float) {
                     tmpRect.set(cx - extent / 2f, cy - extent / 2f, cx + extent / 2f, cy + extent / 2f)
                     val r = side * 0.09f + edge
                     if (lightKeys) {
-                        // 白键上：普通叠加更深一点的同色，方块看得见
+                        // 白键上：普通叠加只深一点点的同色，方块若隐若现（上一版 0.30/0.06 太显、像方格）
                         squarePaint.color = p.deep
-                        squarePaint.alpha = (fade * (if (layer == 0) 0.30f else 0.06f) * 255).toInt()
+                        squarePaint.alpha = (fade * (if (layer == 0) 0.16f else 0.03f) * 255).toInt()
                         canvas.drawRoundRect(tmpRect, r, r, squarePaint)
                     } else {
                         screenPaint.color = p.color
-                        screenPaint.alpha = (fade * (if (layer == 0) 0.32f else 0.05f) * 255).toInt()
+                        screenPaint.alpha = (fade * (if (layer == 0) 0.16f else 0.03f) * 255).toInt()
                         canvas.drawRoundRect(tmpRect, r, r, screenPaint)
                     }
                 }
@@ -447,44 +449,44 @@ class KeyEffectRenderer(private val density: Float) {
 
     companion object {
         /**
-         * 花花「多彩」调色盘：CyIME 七彩光（黄、桃、青柠、薰衣草紫、粉、绿、青）的色相，
-         * 饱和度提高一截（原来 HSV 饱和度约 .35～.45，叠在白灰键上发淡），并补了橙、天蓝，冷暖各半。
+         * 花花「多彩」调色盘：CyIME 那种淡糖果色。九个色相（黄、桃、青柠、薰衣草紫、粉、绿、橙、天蓝、青），
+         * HSV 饱和度 .36～.42、明度 .94～1（上一版饱和度拉到 .6～.75，叠出来整块橘红/青柠绿太重）。
          */
         val VIVID_GLOW = intArrayOf(
-            0xFFFFD23F.toInt(), // 柠檬黄
-            0xFFFF9E80.toInt(), // 桃
-            0xFFB8E83C.toInt(), // 青柠
-            0xFFAE8CFF.toInt(), // 薰衣草紫
-            0xFFFF7FBF.toInt(), // 粉
-            0xFF4FDC8A.toInt(), // 绿
-            0xFFFFB347.toInt(), // 橙
-            0xFF5BC6FF.toInt(), // 天蓝
-            0xFF3FE0D0.toInt(), // 青
+            0xFFFFED94.toInt(), // 柠檬黄  H50 S.42 V1
+            0xFFFFB89E.toInt(), // 桃      H16 S.38 V1
+            0xFFCFF58E.toInt(), // 青柠    H82 S.42 V.96
+            0xFFC5A3FF.toInt(), // 薰衣草紫 H262 S.36 V1
+            0xFFFFA3CE.toInt(), // 粉      H332 S.36 V1
+            0xFF90F0B8.toInt(), // 绿      H145 S.40 V.94
+            0xFFFFCD94.toInt(), // 橙      H32 S.42 V1
+            0xFF9ED8FF.toInt(), // 天蓝    H204 S.38 V1
+            0xFF90F0E6.toInt(), // 青      H174 S.40 V.94
         )
-        /** 炫光底色的不透明度：浅色键 0.85（原 0.75），深色键 0.65（白字上不刺眼） */
-        const val GLOW_FILL_LIGHT = 0.85f
-        const val GLOW_FILL_DARK = 0.65f
+        /** 炫光底色峰值不透明度：浅色键 0.45（上一版 0.85），深色键 0.32（上一版 0.65，白字要看得清），半透明透出键色 */
+        const val GLOW_FILL_LIGHT = 0.45f
+        const val GLOW_FILL_DARK = 0.32f
 
-        /** 饱和度 +0.15、明度 -0.12 的同色 */
+        /** 小方块用的同色：饱和度 +0.08、明度 -0.04，和底色接近（上一版 +0.15/-0.12 太深） */
         fun deepen(color: Int): Int {
             val hsv = FloatArray(3)
             Color.colorToHSV(color, hsv)
-            hsv[1] = (hsv[1] + .15f).coerceAtMost(1f)
-            hsv[2] = (hsv[2] - .12f).coerceAtLeast(0f)
+            hsv[1] = (hsv[1] + .08f).coerceAtMost(1f)
+            hsv[2] = (hsv[2] - .04f).coerceAtLeast(0f)
             return Color.HSVToColor(hsv)
         }
 
         private fun withAlpha(color: Int, alpha: Float): Int =
             (color and 0x00FFFFFF) or ((alpha.coerceIn(0f, 1f) * 255).toInt() shl 24)
 
-        /** 强调色两侧 ±40° 的五个色相，统一成柔和高亮；强调色接近灰时返回 null（用七彩光）。 */
+        /** 强调色两侧 ±40° 的五个色相，统一成淡糖果色（低饱和高明度）；强调色接近灰时返回 null（用七彩光）。 */
         fun themedGlowPalette(accent: Int): IntArray? {
             val hsv = FloatArray(3)
             Color.colorToHSV(accent, hsv)
             if (hsv[1] < .15f) return null
-            val saturation = hsv[1].coerceIn(.55f, .75f)   // 花花：原 .35～.55，太淡
+            val saturation = hsv[1].coerceIn(.35f, .45f)   // 花花：淡糖果色（上一版 .55～.75 太重）
             return floatArrayOf(0f, -20f, 20f, -40f, 40f).map { shift ->
-                Color.HSVToColor(floatArrayOf((hsv[0] + shift + 360f) % 360f, saturation, .96f))
+                Color.HSVToColor(floatArrayOf((hsv[0] + shift + 360f) % 360f, saturation, .98f))
             }.toIntArray()
         }
 

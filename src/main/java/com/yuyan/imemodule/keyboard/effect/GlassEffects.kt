@@ -129,9 +129,8 @@ class LiquidRim {
 
 /**
  * 键盘背景图（主题里的自定义图片）。键盘能拿到这张图的像素，所以：
- *  - 玻璃效果：键帽里先画一层模糊过的背景图（毛玻璃），再叠半透明的原键色；
  *  - 液态玻璃（Android 13+）：键帽外圈弯折这张图，带一点色散。
- * 没有背景图（纯色主题）时这些都不画，玻璃只表现为半透明键色。
+ * 花花：键面改为不透明的主题原色后，毛玻璃底图（[drawFrost]）不再画；没有背景图（纯色主题）时只有亮边。
  *
  * 模糊图只在背景图换了时算一次：先缩到 1/8，再做三遍盒式模糊，画的时候双线性放大，
  * 每次按键不多做任何计算。
@@ -187,18 +186,18 @@ class FrostedBackdrop {
 
     /**
      * 图片背景的边缘折射：只在键帽外圈取样并弯折。原点已平移到键帽左上角，[capLeft]/[capTop] 是键帽在键盘视图里的位置。
-     * 只在硬件加速的画布、Android 13 以上画。
+     * 只在硬件加速的画布、Android 13 以上画。[alpha] 是整体不透明度（花花：键面不透明后画在键面上面，用它减淡）。
      */
     fun drawRefraction(canvas: Canvas, capLeft: Float, capTop: Float, w: Float, h: Float, radius: Float,
-                       strength: LiquidGlassStrength, density: Float) {
+                       strength: LiquidGlassStrength, density: Float, alpha: Float = 1f) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !canvas.isHardwareAccelerated) return
         val src = source ?: return
-        drawRefraction33(canvas, src, capLeft, capTop, w, h, radius, strength, density)
+        drawRefraction33(canvas, src, capLeft, capTop, w, h, radius, strength, density, alpha)
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun drawRefraction33(canvas: Canvas, src: Bitmap, capLeft: Float, capTop: Float, w: Float, h: Float,
-                                 radius: Float, strength: LiquidGlassStrength, density: Float) {
+                                 radius: Float, strength: LiquidGlassStrength, density: Float, alpha: Float) {
         val shader = RefractionShader.shared ?: return
         val image = refractionImage ?: BitmapShader(src, Shader.TileMode.DECAL, Shader.TileMode.DECAL).also {
             it.filterMode = BitmapShader.FILTER_MODE_LINEAR
@@ -207,8 +206,10 @@ class FrostedBackdrop {
         RefractionShader.bind(shader, image, w, h, radius, strength.bevelDp * density, strength.bendDp * density,
             strength.spread, originX - capLeft, originY - capTop, pxPerX, pxPerY)
         refractionPaint.shader = shader
+        refractionPaint.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
         canvas.drawRect(0f, 0f, w, h, refractionPaint)
         refractionPaint.shader = null
+        refractionPaint.alpha = 255
     }
 
     private fun blur(bitmap: Bitmap): Bitmap {
