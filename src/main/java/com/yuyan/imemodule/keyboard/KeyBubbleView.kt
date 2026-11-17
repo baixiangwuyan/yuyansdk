@@ -47,6 +47,16 @@ class KeyBubbleView(context: Context) : View(context) {
 
     /** [keyboard] 里 (left, top, right, bottom) 的键按下了。 */
     fun show(keyboard: View, label: String, left: Int, top: Int, right: Int, bottom: Int) {
+        try {
+            showInternal(keyboard, label, left, top, right, bottom)
+        } catch (e: Throwable) {
+            android.util.Log.e("KeyBubbleView", "show failed", e)
+            this.label = null
+            invalidate()
+        }
+    }
+
+    private fun showInternal(keyboard: View, label: String, left: Int, top: Int, right: Int, bottom: Int) {
         getLocationInWindow(selfLoc)
         keyboard.getLocationInWindow(keyLoc)
         val dx = (keyLoc[0] - selfLoc[0]).toFloat()
@@ -87,6 +97,19 @@ class KeyBubbleView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
+        if (label == null) return
+        // 花花：气泡绘制出错就不画气泡（并停用效果），绝不让输入法界面崩溃。
+        val save = canvas.save()
+        try {
+            drawBubble(canvas)
+        } catch (e: Throwable) {
+            label = null
+            com.yuyan.imemodule.keyboard.effect.KeyEffects.disable("KeyBubbleView.onDraw", e)
+        }
+        canvas.restoreToCount(save)
+    }
+
+    private fun drawBubble(canvas: Canvas) {
         val s = label ?: return
         val radius = body.height() / 2f
         // 柔和阴影：两圈半透明外扩，硬件加速下不用 setShadowLayer。

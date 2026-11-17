@@ -54,6 +54,14 @@ class KeyEffectConfig(
         const val BRIGHT_MIN = 30; const val BRIGHT_MAX = 100      // %
         const val TAIL_MIN = 0; const val TAIL_MAX = 100           // %
         const val LAYERS_MIN = 1; const val LAYERS_MAX = 3         // 道
+
+        /** 花花：所有视觉效果（含气泡）全关。读设置失败、效果绘制出错后用它，键盘按老画法画。 */
+        @JvmField
+        val OFF = KeyEffectConfig(
+            bubble = false, motion = false, glow = false, gap = false, gapStyle = GapLightStyle.TRACE,
+            gapSpeed = 1f, gapReach = 2f, gapWidthDp = 2f, gapBrightness = .9f, gapTail = .6f, gapLayers = 2,
+            glass = false, liquid = false, liquidStrength = LiquidGlassStrength.STANDARD,
+        )
     }
 }
 
@@ -65,6 +73,31 @@ object KeyEffects {
     @Volatile
     var version = 0
         private set
+
+    /**
+     * 花花：效果代码出过异常就置为 true，本进程内不再画任何效果（含按键气泡），保证键盘照常弹出、照常打字。
+     * 用户在设置里改任何一项效果时清掉，重新尝试。
+     */
+    @Volatile
+    var broken = false
+        private set
+
+    fun disable(where: String, e: Throwable) {
+        if (!broken) android.util.Log.e("KeyEffects", "key effect failed in $where, effects disabled", e)
+        broken = true
+        cached = null
+    }
+
+    /** 绘制、按键路径用这个：出错或已停用时返回 [KeyEffectConfig.OFF]，永不抛异常。 */
+    fun safeConfig(): KeyEffectConfig {
+        if (broken) return KeyEffectConfig.OFF
+        return try {
+            config()
+        } catch (e: Throwable) {
+            disable("KeyEffects.config", e)
+            KeyEffectConfig.OFF
+        }
+    }
 
     // SharedPreferences 只弱引用监听器，这里必须强引用住。
     private var listener: SharedPreferences.OnSharedPreferenceChangeListener? = null
@@ -99,6 +132,7 @@ object KeyEffects {
         if (listener != null) return
         val l = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
             cached = null
+            broken = false
             version++
         }
         listener = l

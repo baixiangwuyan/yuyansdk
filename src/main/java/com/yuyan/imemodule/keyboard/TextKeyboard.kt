@@ -154,7 +154,34 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         val keyXMargin = softKeyboard.keyXMargin
         val keyYMargin = (if(skbStyleMode == SkbStyleMode.Google && InputModeSwitcher.isQwert) softKeyboard.keyYMargin * 1.5
             else softKeyboard.keyYMargin.toDouble()).toInt()
-        val effects = KeyEffects.config()
+        // 花花：效果出任何错都不能让键盘画不出来。先按设置画；效果抛异常就关掉效果（本进程内，改设置后重试），
+        // 回到画布初始状态再按“全关”重画一遍——和没有效果时的老画法完全一样。
+        val base = canvas.save()
+        val effects = KeyEffects.safeConfig()
+        try {
+            drawKeyboard(canvas, softKeyboard, keyXMargin, keyYMargin, effects)
+        } catch (e: Throwable) {
+            canvas.restoreToCount(base)
+            if (effects === KeyEffectConfig.OFF) {
+                // 老画法本身出错：记日志，不让输入法崩溃（键盘区可能空白，但候选栏、收起等仍可用）
+                android.util.Log.e("TextKeyboard", "draw keyboard failed", e)
+                return
+            }
+            KeyEffects.disable("TextKeyboard.onDraw", e)
+            keyEffects.clear()
+            val retry = canvas.save()
+            try {
+                drawKeyboard(canvas, softKeyboard, keyXMargin, keyYMargin, KeyEffectConfig.OFF)
+            } catch (e2: Throwable) {
+                canvas.restoreToCount(retry)
+                android.util.Log.e("TextKeyboard", "draw keyboard (effects off) failed", e2)
+            }
+        }
+        canvas.restoreToCount(base)
+    }
+
+    private fun drawKeyboard(canvas: Canvas, softKeyboard: SoftKeyboard, keyXMargin: Int, keyYMargin: Int,
+                             effects: KeyEffectConfig) {
         keyEffects.config = effects
         val glass = effects.glass && isKeyBorder
         if (effects.gap || effects.motion || effects.glow) {
@@ -195,7 +222,16 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
     }
 
     override fun onKeyPressedVisual(key: SoftKey) {
-        val effects = KeyEffects.config()
+        try {
+            pressKeyEffects(key)
+        } catch (e: Throwable) {
+            KeyEffects.disable("TextKeyboard.onKeyPressedVisual", e)
+            keyEffects.clear()
+        }
+    }
+
+    private fun pressKeyEffects(key: SoftKey) {
+        val effects = KeyEffects.safeConfig()
         if (!effects.anyAnimated) return
         keyEffects.config = effects
         val softKeyboard = mSoftKeyboard ?: return
@@ -225,7 +261,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
 
     override fun onKeyReleasedVisual(key: SoftKey?) {
         // 松手时手指可能已经滑到别的键上，按下过的键一律当作松开，免得炫光底色留在原来那个键上。
-        keyEffects.releaseAll()
+        try { keyEffects.releaseAll() } catch (e: Throwable) { KeyEffects.disable("TextKeyboard.onKeyReleasedVisual", e) }
     }
 
     /** 玻璃效果：找到画着主题背景图的那一层（键盘根布局），算出它相对本视图的位置。 */
@@ -469,6 +505,6 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
 
     override fun closing() {
         super.closing()
-        keyEffects.clear()
+        try { keyEffects.clear() } catch (_: Throwable) {}
     }
 }

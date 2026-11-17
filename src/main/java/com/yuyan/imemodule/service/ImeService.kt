@@ -79,13 +79,28 @@ class ImeService : InputMethodService() {
     override fun onCreateInputView(): View {
         if(!::inputView.isInitialized)inputView = InputView(baseContext, this)
         if(!isHardwareKeyboard)mInputView = inputView
+        detachFromParent(inputView)
         return inputView
+    }
+
+    /**
+     * 花花：输入/候选视图是缓存复用的。系统重建输入法窗口（换配置、换显示屏、prepareWindow 重新 initViews 等）后，
+     * 新窗口的框架 addView 时，旧视图还挂在旧框架上，会抛
+     * “The specified child already has a parent”。返回前先从旧父布局上摘下来。
+     */
+    private fun detachFromParent(view: View) {
+        try {
+            (view.parent as? ViewGroup)?.removeView(view)
+        } catch (e: Throwable) {
+            android.util.Log.w("ImeService", "detachFromParent failed", e)
+        }
     }
 
     override fun onCreateCandidatesView(): View {
         if(!::candidateView.isInitialized)candidateView = CandidateView(baseContext, this)
         if(isHardwareKeyboard) mInputView = candidateView
-        currentInputConnection.requestCursorUpdates(InputConnection.CURSOR_UPDATE_MONITOR)
+        currentInputConnection?.requestCursorUpdates(InputConnection.CURSOR_UPDATE_MONITOR)
+        detachFromParent(candidateView)
         return candidateView
     }
 

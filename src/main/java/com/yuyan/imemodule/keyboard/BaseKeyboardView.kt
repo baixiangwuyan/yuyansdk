@@ -107,7 +107,7 @@ open class BaseKeyboardView(mContext: Context?) : View(mContext) {
         if(mCurrentKey != null) {
             val softKey = mCurrentKey!!
             val keyboardSymbol = ThemeManager.prefs.keyboardSymbol.getValue()
-            mService?.keyBubble?.hide()   // 花花：长按弹出选项时收起按键气泡
+            hideBubble()   // 花花：长按弹出选项时收起按键气泡
             if (softKey.getkeyLabel().isNotBlank() && softKey.code != InputModeSwitcher.USER_KEYCODE_COMMA_EMOJI ) {
                 val keyLabel = if (InputModeSwitcher.isLower) softKey.keyLabel.lowercase() else softKey.keyLabel
                 val designPreset = setOf("，", "。", ",", ".")
@@ -325,10 +325,10 @@ open class BaseKeyboardView(mContext: Context?) : View(mContext) {
         mCurrentKey?.onReleased()
         if (key != null) {
             key.onPressed()
-            onKeyPressedVisual(key)
+            safeVisual { onKeyPressedVisual(key) }
             showBalloonText(key)
         } else {
-            mService?.keyBubble?.hide()
+            hideBubble()
             popupComponent.dismissPopup()
         }
         invalidateKey()
@@ -342,8 +342,8 @@ open class BaseKeyboardView(mContext: Context?) : View(mContext) {
             mService?.responseLongKeyEvent(popupComponent.triggerFocused())
             mLongPressKey = false
         }
-        mService?.keyBubble?.hide()
-        onKeyReleasedVisual(mCurrentKey)
+        hideBubble()
+        safeVisual { onKeyReleasedVisual(mCurrentKey) }
         if (mCurrentKey != null) {
             mCurrentKey!!.onReleased()
             if(mService == null) return
@@ -362,11 +362,29 @@ open class BaseKeyboardView(mContext: Context?) : View(mContext) {
      * 开关沿用原来的「按键气泡」（keyboard_balloon_show_enable），默认改为开。
      */
     private fun showBalloonText(key: SoftKey) {
-        val bubble = mService?.keyBubble ?: return
-        if (!com.yuyan.imemodule.keyboard.effect.KeyEffects.config().bubble) { bubble.hide(); return }
-        val label = bubbleLabel(key)
-        if (label.isNullOrEmpty()) { bubble.hide(); return }
-        bubble.show(this, label, key.mLeft, key.mTop, key.mRight, key.mBottom)
+        // 花花：气泡出错不能影响按键本身（按下高亮、上屏），出错就停用效果并收起气泡。
+        try {
+            val bubble = mService?.keyBubble ?: return
+            if (!com.yuyan.imemodule.keyboard.effect.KeyEffects.safeConfig().bubble) { bubble.hide(); return }
+            val label = bubbleLabel(key)
+            if (label.isNullOrEmpty()) { bubble.hide(); return }
+            bubble.show(this, label, key.mLeft, key.mTop, key.mRight, key.mBottom)
+        } catch (e: Throwable) {
+            com.yuyan.imemodule.keyboard.effect.KeyEffects.disable("BaseKeyboardView.showBalloonText", e)
+            hideBubble()
+        }
+    }
+
+    /** 花花：收起按键气泡，永不抛异常。 */
+    private fun hideBubble() {
+        try { mService?.keyBubble?.hide() } catch (_: Throwable) {}
+    }
+
+    /** 花花：按键视觉效果回调出错时停用效果，不影响按键逻辑。 */
+    private inline fun safeVisual(block: () -> Unit) {
+        try { block() } catch (e: Throwable) {
+            com.yuyan.imemodule.keyboard.effect.KeyEffects.disable("BaseKeyboardView.visual", e)
+        }
     }
 
     fun getKeyIndices(x: Int, y: Int): SoftKey? {

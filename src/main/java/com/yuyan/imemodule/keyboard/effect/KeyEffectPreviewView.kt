@@ -85,7 +85,7 @@ class KeyEffectPreviewView(context: Context) : FrameLayout(context) {
                     key.onPressed()
                     onKeyPressedVisual(key)
                     val label = bubbleLabel(key)
-                    if (KeyEffects.config().bubble && !label.isNullOrEmpty()) bubble.show(this, label, key.mLeft, key.mTop, key.mRight, key.mBottom)
+                    if (KeyEffects.safeConfig().bubble && !label.isNullOrEmpty()) bubble.show(this, label, key.mLeft, key.mTop, key.mRight, key.mBottom)
                     else bubble.hide()
                     invalidate()
                 }

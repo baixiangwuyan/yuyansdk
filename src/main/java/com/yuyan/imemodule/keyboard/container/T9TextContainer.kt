@@ -46,6 +46,8 @@ open class T9TextContainer(context: Context?, inputView: InputView, skbValue: In
     // 键盘、候选词界面上符号(T9左侧、手写右侧)、候选拼音ListView
     private val mRVLeftPrefix : SwipeRecyclerView = inflate(getContext(), R.layout.sdk_view_rv_prefix, null) as SwipeRecyclerView
     private var mPrefixAdapter: PrefixAdapter? = null
+    /** 花花：左侧列表当前显示的是候选拼音（true）还是侧边符号（false）；点击监听器按它分派 */
+    private var mPrefixShowsPinyin = false
     private val mLlAddSymbol : LinearLayout = LinearLayout(context).apply{
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT).apply { margin = (dp(20)) }
@@ -67,6 +69,21 @@ open class T9TextContainer(context: Context?, inputView: InputView, skbValue: In
         mLlAddSymbol.addView(ivAddSymbol)
         mSideSymbolsPinyin =  if(skbValue == InputModeSwitcher.MASK_SKB_LAYOUT_NUMBER) DataBaseKT.instance.sideSymbolDao().getAllSideSymbolNumber()
                 else DataBaseKT.instance.sideSymbolDao().getAllSideSymbolPinyin()
+        // 花花：SwipeRecyclerView 只允许在 setAdapter 之前设置点击监听器（之后设置会抛 IllegalStateException），
+        // 而现在打字时复用适配器、不再 setAdapter(null)，所以监听器只在这里（首次 setAdapter 之前）设一次，
+        // 点击时按 mPrefixShowsPinyin 判断当前显示的是拼音还是符号。
+        mRVLeftPrefix.setOnItemClickListener{ _: View?, position: Int ->
+            if (!mPrefixShowsPinyin) {
+                val symbol = mSideSymbolsPinyin.getOrNull(position)?.symbolValue ?: return@setOnItemClickListener
+                val softKey = SoftKey(label = symbol)
+                // 播放按键声音和震动
+                DevicesUtils.tryPlayKeyDown()
+                DevicesUtils.tryVibrate(this)
+                inputView.responseKeyEvent(softKey)
+            } else {
+                inputView.selectPrefix(position)
+            }
+        }
     }
 
     /**
@@ -113,18 +130,7 @@ open class T9TextContainer(context: Context?, inputView: InputView, skbValue: In
         if (!isPrefixs) { // 有候选拼音显示候选拼音
             prefixs = mSideSymbolsPinyin.map { it.symbolKey }.toTypedArray()
         }
-        mRVLeftPrefix.setOnItemClickListener{ _: View?, position: Int ->
-            if (!isPrefixs) {
-                val symbol = mSideSymbolsPinyin.map { it.symbolValue }[position]
-                val softKey = SoftKey(label = symbol)
-                // 播放按键声音和震动
-                DevicesUtils.tryPlayKeyDown()
-                DevicesUtils.tryVibrate(this)
-                inputView.responseKeyEvent(softKey)
-            } else {
-                inputView.selectPrefix(position)
-            }
-        }
+        mPrefixShowsPinyin = isPrefixs
         // 花花：每打一个字都 setAdapter(null)+setAdapter(新适配器) 会清空回收池、重新创建所有条目视图。
         // 页脚（符号设置按钮）状态没变时只换数据；变了（有拼音↔无拼音）仍按原来的方式整个换。
         val adapter = mPrefixAdapter
