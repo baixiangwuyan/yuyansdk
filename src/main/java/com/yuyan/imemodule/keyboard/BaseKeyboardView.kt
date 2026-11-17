@@ -6,7 +6,6 @@ import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
-import android.text.TextUtils
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.KeyEvent
@@ -93,11 +92,22 @@ open class BaseKeyboardView(mContext: Context?) : View(mContext) {
         invalidate()
     }
 
-    open fun onBufferDraw() {}
+    /** 花花：按下（ACTION_DOWN 当帧）通知子类开始按键效果。 */
+    open fun onKeyPressedVisual(key: SoftKey) {}
+
+    /** 花花：松开；[key] 为 null 表示全部松开。 */
+    open fun onKeyReleasedVisual(key: SoftKey?) {}
+
+    /** 花花：按键气泡里显示的字；返回 null 不弹气泡（功能键、图标键）。 */
+    open fun bubbleLabel(key: SoftKey): String? {
+        if (key.isUserDefKey || key.keyIcon != null) return null
+        return key.getkeyLabel().takeIf { it.isNotBlank() }
+    }
     private fun openPopupIfRequired() {
         if(mCurrentKey != null) {
             val softKey = mCurrentKey!!
             val keyboardSymbol = ThemeManager.prefs.keyboardSymbol.getValue()
+            mService?.keyBubble?.hide()   // 花花：长按弹出选项时收起按键气泡
             if (softKey.getkeyLabel().isNotBlank() && softKey.code != InputModeSwitcher.USER_KEYCODE_COMMA_EMOJI ) {
                 val keyLabel = if (InputModeSwitcher.isLower) softKey.keyLabel.lowercase() else softKey.keyLabel
                 val designPreset = setOf("，", "。", ",", ".")
@@ -315,8 +325,10 @@ open class BaseKeyboardView(mContext: Context?) : View(mContext) {
         mCurrentKey?.onReleased()
         if (key != null) {
             key.onPressed()
+            onKeyPressedVisual(key)
             showBalloonText(key)
         } else {
+            mService?.keyBubble?.hide()
             popupComponent.dismissPopup()
         }
         invalidateKey()
@@ -330,6 +342,8 @@ open class BaseKeyboardView(mContext: Context?) : View(mContext) {
             mService?.responseLongKeyEvent(popupComponent.triggerFocused())
             mLongPressKey = false
         }
+        mService?.keyBubble?.hide()
+        onKeyReleasedVisual(mCurrentKey)
         if (mCurrentKey != null) {
             mCurrentKey!!.onReleased()
             if(mService == null) return
@@ -343,12 +357,16 @@ open class BaseKeyboardView(mContext: Context?) : View(mContext) {
         removeMessages()
     }
 
+    /**
+     * 花花：按键气泡。按下当帧就画在输入法界面最上面一层（[KeyBubbleView]），不增删 View、不重新布局。
+     * 开关沿用原来的「按键气泡」（keyboard_balloon_show_enable），默认改为开。
+     */
     private fun showBalloonText(key: SoftKey) {
-        val keyboardBalloonShow = AppPrefs.getInstance().keyboardSetting.keyboardBalloonShow.getValue()
-        if (keyboardBalloonShow && !TextUtils.isEmpty(key.getkeyLabel())) {
-            val bounds = Rect(key.mLeft, key.mTop, key.mRight, key.mBottom)
-            popupComponent.showPopup(key.getkeyLabel(), bounds)
-        }
+        val bubble = mService?.keyBubble ?: return
+        if (!com.yuyan.imemodule.keyboard.effect.KeyEffects.config().bubble) { bubble.hide(); return }
+        val label = bubbleLabel(key)
+        if (label.isNullOrEmpty()) { bubble.hide(); return }
+        bubble.show(this, label, key.mLeft, key.mTop, key.mRight, key.mBottom)
     }
 
     fun getKeyIndices(x: Int, y: Int): SoftKey? {

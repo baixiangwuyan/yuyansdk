@@ -45,6 +45,7 @@ open class T9TextContainer(context: Context?, inputView: InputView, skbValue: In
     private val mSideSymbolsPinyin:List<SideSymbol>
     // 键盘、候选词界面上符号(T9左侧、手写右侧)、候选拼音ListView
     private val mRVLeftPrefix : SwipeRecyclerView = inflate(getContext(), R.layout.sdk_view_rv_prefix, null) as SwipeRecyclerView
+    private var mPrefixAdapter: PrefixAdapter? = null
     private val mLlAddSymbol : LinearLayout = LinearLayout(context).apply{
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT).apply { margin = (dp(20)) }
@@ -111,16 +112,7 @@ open class T9TextContainer(context: Context?, inputView: InputView, skbValue: In
         val isPrefixs = prefixs.isNotEmpty()
         if (!isPrefixs) { // 有候选拼音显示候选拼音
             prefixs = mSideSymbolsPinyin.map { it.symbolKey }.toTypedArray()
-            if (mRVLeftPrefix.footerCount <= 0) {
-                mRVLeftPrefix.addFooterView(mLlAddSymbol)
-            }
-        } else {
-            if (mRVLeftPrefix.footerCount > 0) {
-                mRVLeftPrefix.removeFooterView(mLlAddSymbol)
-            }
         }
-        val adapter = PrefixAdapter(context, prefixs)
-        mRVLeftPrefix.setAdapter(null)
         mRVLeftPrefix.setOnItemClickListener{ _: View?, position: Int ->
             if (!isPrefixs) {
                 val symbol = mSideSymbolsPinyin.map { it.symbolValue }[position]
@@ -133,6 +125,27 @@ open class T9TextContainer(context: Context?, inputView: InputView, skbValue: In
                 inputView.selectPrefix(position)
             }
         }
-        mRVLeftPrefix.setAdapter(adapter)
+        // 花花：每打一个字都 setAdapter(null)+setAdapter(新适配器) 会清空回收池、重新创建所有条目视图。
+        // 页脚（符号设置按钮）状态没变时只换数据；变了（有拼音↔无拼音）仍按原来的方式整个换。
+        val adapter = mPrefixAdapter
+        val footerShown = mRVLeftPrefix.footerCount > 0
+        if (adapter != null && footerShown == !isPrefixs && mRVLeftPrefix.adapter != null) {
+            adapter.setData(prefixs)
+            mRVLeftPrefix.scrollToPosition(0)
+            return
+        }
+        if (!isPrefixs) {
+            if (mRVLeftPrefix.footerCount <= 0) {
+                mRVLeftPrefix.addFooterView(mLlAddSymbol)
+            }
+        } else {
+            if (mRVLeftPrefix.footerCount > 0) {
+                mRVLeftPrefix.removeFooterView(mLlAddSymbol)
+            }
+        }
+        val newAdapter = PrefixAdapter(context, prefixs)
+        mPrefixAdapter = newAdapter
+        mRVLeftPrefix.setAdapter(null)
+        mRVLeftPrefix.setAdapter(newAdapter)
     }
 }

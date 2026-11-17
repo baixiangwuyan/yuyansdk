@@ -1,14 +1,20 @@
 package com.yuyan.imemodule.keyboard
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Paint.FontMetricsInt
-import android.graphics.PorterDuff
+import android.graphics.Color
+import android.graphics.RectF
+import android.graphics.drawable.BitmapDrawable
+import androidx.core.graphics.ColorUtils
+import com.yuyan.imemodule.keyboard.effect.FrostedBackdrop
+import com.yuyan.imemodule.keyboard.effect.KeyEffectConfig
+import com.yuyan.imemodule.keyboard.effect.KeyEffectRenderer
+import com.yuyan.imemodule.keyboard.effect.KeyEffects
+import com.yuyan.imemodule.keyboard.effect.LiquidRim
 import android.graphics.Rect
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.KeyEvent
 import com.yuyan.imemodule.data.theme.Theme
@@ -21,10 +27,7 @@ import com.yuyan.imemodule.manager.InputModeSwitcher
 import com.yuyan.imemodule.prefs.AppPrefs
 import com.yuyan.imemodule.service.DictDecoder
 import com.yuyan.imemodule.singleton.EnvironmentSingleton.Companion.instance
-import kotlin.math.max
 import kotlin.math.min
-import androidx.core.graphics.createBitmap
-import androidx.core.graphics.withSave
 import com.yuyan.imemodule.application.CustomConstant
 import com.yuyan.imemodule.prefs.behavior.SkbStyleMode
 import com.yuyan.imemodule.service.InputDispatcher
@@ -34,8 +37,6 @@ import com.yuyan.imemodule.service.InputDispatcher
  */
 open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
     private var mKeyboardChanged = false
-    private var mBuffer: Bitmap? = null
-    private var mCanvas: Canvas? = null
     private var mNormalKeyTextSize = 0   //正常按键的文本大小
     private var mNormalKeyTextSizeSmall = 0  //正常按键的文本大小(小值)
     private val mPaint: Paint = Paint()   //绘制按键的画笔
@@ -46,8 +47,18 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
     private var keyboardFontBold = false
     private var keyboardSymbol = false
     private var keyboardMnemonic = false
-    protected var mDirtyRect = Rect()
     private var skbStyleMode: SkbStyleMode = prefs.skbStyleMode.getValue()
+
+    // 花花：按键效果（气泡以外的视觉效果，见 keyboard/effect）。关着时不画任何东西。
+    private val keyEffects = KeyEffectRenderer(resources.displayMetrics.density)
+    private var keyEffectsLaidOut = false
+    private val keyCap = RectF()
+    private val capPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val glassEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val liquidRim = LiquidRim()
+    private val frosted = FrostedBackdrop()
+    private val selfLoc = IntArray(2)
+    private val bgLoc = IntArray(2)
 
     /**
      * 构造方法
@@ -72,6 +83,8 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         mActiveTheme = activeTheme
         mPaint.color = mActiveTheme.keyTextColor
         mKeyboardChanged = true
+        keyEffectsLaidOut = false
+        keyEffects.clear()
         invalidateView()
     }
 
@@ -89,7 +102,8 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         }
         val isEnglishCell = AppPrefs.getInstance().input.abcSearchEnglishCell.getValue()
         softKey?.enableToggleState(shiftState + if(isEnglishCell) 3 else 0)
-        invalidateView()
+        // 花花：只是换了按键状态图标，尺寸不变，不必 requestLayout（以前每次都会触发一轮布局）。
+        invalidateKey()
     }
 
     /**
@@ -120,49 +134,155 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
 
     public override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        mBuffer = null
+        keyEffectsLaidOut = false
     }
 
+    /**
+     * 花花：直接画在（硬件加速的）画布上。
+     *
+     * 以前每次按下、松开都把整块键盘在 CPU 上重画进一张全尺寸位图，再把这张位图整张传给 GPU；
+     * 现在只记录绘制指令，按下高亮更快出来，按键动效也能逐帧画而不重传位图。
+     */
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        mDirtyRect.union(0, 0, width, height)
-        if (mDrawPending || mBuffer == null || mKeyboardChanged) {
-            onBufferDraw()
+        mKeyboardChanged = false
+        mDrawPending = false
+        val softKeyboard = mSoftKeyboard ?: return
+        val env = instance
+        mNormalKeyTextSize = env.keyTextSize
+        mNormalKeyTextSizeSmall = env.keyTextSmallSize
+        val keyXMargin = softKeyboard.keyXMargin
+        val keyYMargin = (if(skbStyleMode == SkbStyleMode.Google && InputModeSwitcher.isQwert) softKeyboard.keyYMargin * 1.5
+            else softKeyboard.keyYMargin.toDouble()).toInt()
+        val effects = KeyEffects.config()
+        keyEffects.config = effects
+        val glass = effects.glass && isKeyBorder
+        if (effects.gap || effects.motion || effects.glow) {
+            if (!keyEffectsLaidOut) layoutKeyEffects(softKeyboard, keyXMargin, keyYMargin)
+            keyEffects.accentColor = mActiveTheme.accentKeyBackgroundColor
+            keyEffects.translucentCaps = glass || !isKeyBorder
+            keyEffects.drawUnderKeys(canvas, width, height, mActiveTheme.accentKeyBackgroundColor)
         }
-        canvas.drawBitmap(mBuffer!!, 0f, 0f, null)
+        if (glass) updateBackdrop()
+        var index = 0
+        for (softKeys in softKeyboard.mKeyRows) {
+            for (softKey in softKeys) {
+                drawSoftKey(canvas, softKey, keyXMargin, keyYMargin, index, effects, glass)
+                index++
+            }
+        }
+        if (effects.anyAnimated && keyEffects.isAnimating()) postInvalidateOnAnimation()
     }
 
-    override fun onBufferDraw() {
-        if (mBuffer == null || mKeyboardChanged) {
-            if (mBuffer == null || mBuffer!!.width != width || mBuffer!!.height != height) {
-                val width = max(1.0, width.toDouble()).toInt()
-                val height = max(1.0, height.toDouble()).toInt()
-                mBuffer = createBitmap(width, height)
-                mCanvas = Canvas(mBuffer!!)
-            }
-            invalidateKey()
-            mKeyboardChanged = false
+    /** 把每个键的格子告诉按键效果（键缝网按它算）。 */
+    private fun layoutKeyEffects(softKeyboard: SoftKeyboard, keyXMargin: Int, keyYMargin: Int) {
+        val count = softKeyboard.mKeyRows.sumOf { it.size }
+        val cells = FloatArray(count * 4)
+        var i = 0
+        for (row in softKeyboard.mKeyRows) for (key in row) {
+            cells[i * 4] = key.mLeft.toFloat(); cells[i * 4 + 1] = key.mTop.toFloat()
+            cells[i * 4 + 2] = key.mRight.toFloat(); cells[i * 4 + 3] = key.mBottom.toFloat()
+            i++
         }
-        if (mSoftKeyboard == null) return
-        mCanvas!!.withSave {
-            val canvas = mCanvas
-            canvas?.clipRect(mDirtyRect)
-            canvas?.drawColor(0x00000000, PorterDuff.Mode.CLEAR)
-            val env = instance
-            mNormalKeyTextSize = env.keyTextSize
-            mNormalKeyTextSizeSmall = env.keyTextSmallSize
-            val keyXMargin = mSoftKeyboard!!.keyXMargin
-            val keyYMargin = if(skbStyleMode == SkbStyleMode.Google && InputModeSwitcher.isQwert) mSoftKeyboard!!.keyYMargin * 1.5
-                else mSoftKeyboard!!.keyYMargin
-            for (softKeys in mSoftKeyboard!!.mKeyRows) {
-                for (softKey in softKeys) {
-                    canvas?.let { drawSoftKey(it, softKey, keyXMargin, keyYMargin.toInt()) }
-                }
-            }
-            mCanvas!!
+        keyEffects.setKeys(cells, count, keyXMargin.toFloat(), keyYMargin.toFloat(), keyRadius.toFloat())
+        keyEffectsLaidOut = true
+    }
+
+    private fun keyIndexOf(key: SoftKey): Int {
+        var i = 0
+        for (row in mSoftKeyboard?.mKeyRows ?: return -1) for (k in row) { if (k === key) return i; i++ }
+        return -1
+    }
+
+    override fun onKeyPressedVisual(key: SoftKey) {
+        val effects = KeyEffects.config()
+        if (!effects.anyAnimated) return
+        keyEffects.config = effects
+        val softKeyboard = mSoftKeyboard ?: return
+        if (!keyEffectsLaidOut) {
+            val keyYMargin = (if(skbStyleMode == SkbStyleMode.Google && InputModeSwitcher.isQwert) softKeyboard.keyYMargin * 1.5
+                else softKeyboard.keyYMargin.toDouble()).toInt()
+            layoutKeyEffects(softKeyboard, softKeyboard.keyXMargin, keyYMargin)
         }
-        mDrawPending = false
-        mDirtyRect.setEmpty()
+        keyEffects.accentColor = mActiveTheme.accentKeyBackgroundColor
+        val index = keyIndexOf(key)
+        if (index >= 0) keyEffects.press(index, key.code == KeyEvent.KEYCODE_DEL)
+    }
+
+    override fun bubbleLabel(key: SoftKey): String? {
+        when (key.code) {
+            KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_SHIFT_LEFT,
+            KeyEvent.KEYCODE_SHIFT_RIGHT, KeyEvent.KEYCODE_AT, KeyEvent.KEYCODE_TAB -> return null
+        }
+        if (key.isUserDefKey || key.keyIcon != null) return null
+        val label = if (skbStyleMode == SkbStyleMode.Google) {
+            if (InputModeSwitcher.isLower) key.keyLabel.lowercase() else key.keyLabel
+        } else {
+            if (InputModeSwitcher.isLower && InputModeSwitcher.isEnglish) key.keyLabel.lowercase() else key.keyLabel
+        }
+        return label.takeIf { it.isNotBlank() }
+    }
+
+    override fun onKeyReleasedVisual(key: SoftKey?) {
+        // 松手时手指可能已经滑到别的键上，按下过的键一律当作松开，免得炫光底色留在原来那个键上。
+        keyEffects.releaseAll()
+    }
+
+    /** 玻璃效果：找到画着主题背景图的那一层（键盘根布局），算出它相对本视图的位置。 */
+    private fun updateBackdrop() {
+        var v: android.view.View? = this
+        var holder: android.view.View? = null
+        while (v != null) {
+            if (v.background is BitmapDrawable) { holder = v; break }
+            v = v.parent as? android.view.View
+        }
+        val drawable = holder?.background as? BitmapDrawable
+        if (holder == null || drawable == null) { frosted.update(null, 0f, 0f, 0f, 0f); return }
+        getLocationInWindow(selfLoc)
+        holder.getLocationInWindow(bgLoc)
+        val b = drawable.bounds
+        frosted.colorFilter = drawable.colorFilter
+        frosted.update(drawable.bitmap, (bgLoc[0] - selfLoc[0] + b.left).toFloat(), (bgLoc[1] - selfLoc[1] + b.top).toFloat(),
+            b.width().toFloat(), b.height().toFloat())
+    }
+
+    /** 键帽底色。玻璃关着时和原来一模一样（同样的圆角矩形、同样的颜色）。 */
+    private fun drawCap(canvas: Canvas, color: Int, glass: Boolean, effects: KeyEffectConfig, pressed: Boolean) {
+        val radius = keyRadius.toFloat()
+        if (!glass) {
+            capPaint.shader = null
+            capPaint.color = color
+            canvas.drawRoundRect(keyCap, radius, radius, capPaint)
+            return
+        }
+        val hasImage = frosted.available
+        if (hasImage) frosted.drawFrost(canvas, keyCap, radius)
+        val w = keyCap.width(); val h = keyCap.height()
+        if (effects.liquid && hasImage) {
+            val save = canvas.save()
+            canvas.translate(keyCap.left, keyCap.top)
+            frosted.drawRefraction(canvas, keyCap.left, keyCap.top, w, h, radius, effects.liquidStrength, resources.displayMetrics.density)
+            canvas.restoreToCount(save)
+        }
+        // 保留原来的键色，只是变成半透明：有背景图时透出下面模糊过的图，纯色背景时透出一点底色。
+        val alpha = Color.alpha(color) / 255f * (if (hasImage) 0.5f else 0.72f)
+        capPaint.shader = null
+        capPaint.color = (color and 0x00FFFFFF) or ((alpha * 255).toInt() shl 24)
+        canvas.drawRoundRect(keyCap, radius, radius, capPaint)
+        if (effects.liquid) {
+            val save = canvas.save()
+            canvas.translate(keyCap.left, keyCap.top)
+            val dark = ColorUtils.calculateLuminance(mActiveTheme.keyBackgroundColor or (0xFF shl 24)) < 0.5
+            liquidRim.draw(canvas, w, h, radius, dark, effects.liquidStrength, resources.displayMetrics.density, pressed)
+            canvas.restoreToCount(save)
+        } else {
+            // 毛玻璃的一道淡淡的亮边。
+            glassEdgePaint.strokeWidth = resources.displayMetrics.density * 0.75f
+            glassEdgePaint.color = Color.argb(if (mActiveTheme.isDark) 0x22 else 0x55, 255, 255, 255)
+            val inset = glassEdgePaint.strokeWidth / 2f
+            canvas.drawRoundRect(keyCap.left + inset, keyCap.top + inset, keyCap.right - inset, keyCap.bottom - inset,
+                radius, radius, glassEdgePaint)
+        }
     }
 
     /**
@@ -173,14 +293,16 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
      * @param keyXMargin 按键左右边间距
      * @param keyYMargin 按键上下边间距
      */
-    private fun drawSoftKey(canvas: Canvas, softKey: SoftKey, keyXMargin: Int, keyYMargin: Int) {
-        val bg = GradientDrawable()
-        bg.shape = GradientDrawable.RECTANGLE
-        bg.cornerRadius = keyRadius.toFloat() // 设置圆角半径
-        bg.setBounds(softKey.mLeft + keyXMargin, softKey.mTop + keyYMargin, softKey.mRight - keyXMargin, softKey.mBottom - keyYMargin)
-        if (softKey.pressed || (mService?.hasSelection == true && softKey.code == InputModeSwitcher.USER_KEYCODE_SELECT_MODE)) {
-            bg.setColor(mActiveTheme.keyPressHighlightColor)
-            bg.draw(canvas)
+    private fun drawSoftKey(canvas: Canvas, softKey: SoftKey, keyXMargin: Int, keyYMargin: Int, index: Int,
+                            effects: KeyEffectConfig, glass: Boolean) {
+        val scale = if (effects.motion) keyEffects.capScale(index) else 1f
+        val saveCount = canvas.save()
+        if (scale != 1f) canvas.scale(scale, scale, (softKey.mLeft + softKey.mRight) / 2f, (softKey.mTop + softKey.mBottom) / 2f)
+        keyCap.set((softKey.mLeft + keyXMargin).toFloat(), (softKey.mTop + keyYMargin).toFloat(),
+            (softKey.mRight - keyXMargin).toFloat(), (softKey.mBottom - keyYMargin).toFloat())
+        val pressedLook = softKey.pressed || (mService?.hasSelection == true && softKey.code == InputModeSwitcher.USER_KEYCODE_SELECT_MODE)
+        if (pressedLook) {
+            drawCap(canvas, mActiveTheme.keyPressHighlightColor, glass, effects, true)
         } else if (isKeyBorder) {
             val background = when (softKey.code) {
                 KeyEvent.KEYCODE_ENTER -> mActiveTheme.accentKeyBackgroundColor
@@ -188,19 +310,24 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
                 KeyEvent.KEYCODE_AT -> if (AppPrefs.getInstance().input.chineseFanTi.getValue()) mActiveTheme.accentKeyBackgroundColor else mActiveTheme.keyBackgroundColor
                 else  -> mActiveTheme.keyBackgroundColor
             }
-            bg.setColor(background)
-            bg.draw(canvas)
+            drawCap(canvas, background, glass, effects, false)
         } else if(softKey.code == KeyEvent.KEYCODE_ENTER) {
-               bg.setColor(mActiveTheme.accentKeyBackgroundColor)
-               bg.shape = GradientDrawable.OVAL
+               capPaint.shader = null
+               capPaint.color = mActiveTheme.accentKeyBackgroundColor
                val bgWidth = softKey.width() -  keyXMargin
                val bgHeight = softKey.height() - keyYMargin
                val radius = min(bgWidth, bgHeight)*3/4
                val keyMarginX = (bgWidth - radius)/2
                val keyMarginY = (bgHeight - radius)/2
-                bg.setBounds(softKey.mLeft + keyMarginX, softKey.mTop + keyMarginY, softKey.mRight - keyMarginX, softKey.mBottom - keyMarginY)
-                bg.draw(canvas)
+               canvas.drawOval((softKey.mLeft + keyMarginX).toFloat(), (softKey.mTop + keyMarginY).toFloat(),
+                   (softKey.mRight - keyMarginX).toFloat(), (softKey.mBottom - keyMarginY).toFloat(), capPaint)
         }
+        if (effects.glow) keyEffects.drawGlow(canvas, index, keyCap, keyRadius.toFloat())
+        drawKeyContent(canvas, softKey, keyXMargin)
+        canvas.restoreToCount(saveCount)
+    }
+
+    private fun drawKeyContent(canvas: Canvas, softKey: SoftKey, keyXMargin: Int) {
         var keyLabel = if(softKey.code == KeyEvent.KEYCODE_AT) {
             // 繁/简键动态显示单字：繁体显示"繁"，简体显示"简"
             if (AppPrefs.getInstance().input.chineseFanTi.getValue()) "繁" else "简"
@@ -342,7 +469,6 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
 
     override fun closing() {
         super.closing()
-        mBuffer = null
-        mCanvas = null
+        keyEffects.clear()
     }
 }

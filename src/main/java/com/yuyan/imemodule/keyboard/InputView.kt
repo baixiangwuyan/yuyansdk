@@ -95,6 +95,9 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
     // 记录删除内容
     private val textBeforeCursors = StringQueue(50)
 
+    /** 花花：按键气泡（按下字符键时上方放大的字） */
+    val keyBubble = KeyBubbleView(context)
+
     init {
         initNavbarBackground(service)
         mSkbRoot = LayoutInflater.from(context).inflate(R.layout.sdk_skb_container, this, false) as RelativeLayout
@@ -103,6 +106,8 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
         // 落在按键/候选栏上的触摸会放行给下面的键盘。只在开启“全屏手写”且处于手写键盘时生效
         mFullHandwritingView = FullHandwritingView(context, this)
         addView(mFullHandwritingView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        // 花花：按键气泡层，盖在键盘上、长按弹窗下，不收触摸
+        addView(keyBubble, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         mSkbCandidatesBarView = mSkbRoot.findViewById(R.id.candidates_bar)
         // 花花：引擎后台加载完成后，补上加载期间排队的按键并刷新候选
         com.yuyan.imemodule.service.EngineLoader.addReadyListener { if (!InputDispatcher.isFinish) updateCandidate() }

@@ -17,6 +17,7 @@ import com.yuyan.imemodule.prefs.behavior.FullDisplayKeyMode
 import com.yuyan.imemodule.prefs.behavior.HalfWidthSymbolsMode
 import com.yuyan.imemodule.prefs.behavior.KeyboardOneHandedMod
 import com.yuyan.imemodule.utils.DevicesUtils
+import com.yuyan.imemodule.view.preference.ManagedPreference
 
 
 class AppPrefs(private val sharedPreferences: SharedPreferences) {
@@ -127,7 +128,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             defaultLabel = R.string.system_default
         )
 
-        val keyboardBalloonShow = switch(R.string.keypopup_input_settings, "keyboard_balloon_show_enable", false)
+        // 花花：按键气泡默认开，开关挪到「按键效果」页（这里不再显示）
+        val keyboardBalloonShow = ManagedPreference.PBool(sharedPreferences, "keyboard_balloon_show_enable", true).apply { register() }
 
         val longPressTimeout = int(
             R.string.long_press_timeout,
@@ -293,6 +295,23 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         return provider
     }
 
+    /** 花花：「按键效果」里的视觉效果（按键气泡见 [KeyboardSetting.keyboardBalloonShow]），默认全关 */
+    inner class KeyEffect : ManagedPreferenceInternal(sharedPreferences) {
+        val motion = bool("key_effect_motion", false)          // 按键动效：缩放回弹
+        val glow = bool("key_effect_glow", false)              // 键内炫光
+        val gap = bool("key_effect_gap", false)                // 键缝动效
+        val gapStyle = string("key_effect_gap_style", "trace") // trace 线路 / frame 方框 / diamond 菱形
+        val gapSpeed = int("key_effect_gap_speed", 10)         // 速度，×0.1 倍（5～20）
+        val gapReach = int("key_effect_gap_reach", 20)         // 范围，×0.1 个键（10～40）
+        val gapWidth = int("key_effect_gap_width", 20)         // 线宽，×0.1 dp（10～40）
+        val gapBrightness = int("key_effect_gap_brightness", 90) // 亮度 %（30～100）
+        val gapTail = int("key_effect_gap_tail", 60)           // 拖尾 %（0～100）
+        val gapLayers = int("key_effect_gap_layers", 2)        // 层数（1～3 道）
+        val glass = bool("key_effect_glass", false)            // 玻璃效果
+        val liquid = bool("key_effect_liquid", false)          // 液态玻璃（需玻璃开着）
+        val liquidStrength = string("key_effect_liquid_strength", "standard") // standard/strong/strongest
+    }
+
     private fun <T : ManagedPreferenceProvider> T.register() = this.apply {
         registerProvider { this }
     }
@@ -305,6 +324,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     val clipboard = Clipboard().register()
     val keyboardSetting = KeyboardSetting().register()
     val other = Other().register()
+    val keyEffect = KeyEffect().register()
 
     private val onSharedPreferenceChangeListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -338,6 +358,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 it.value.putValueTo(this@edit)
             }
             other.managedPreferences.forEach {
+                it.value.putValueTo(this@edit)
+            }
+            keyEffect.managedPreferences.forEach {
                 it.value.putValueTo(this@edit)
             }
         }

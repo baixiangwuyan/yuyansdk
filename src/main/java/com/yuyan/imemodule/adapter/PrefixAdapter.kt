@@ -13,7 +13,7 @@ import com.yuyan.imemodule.view.popup.AutoScaleTextView
 /**
  * 拼音选择
  */
-class PrefixAdapter(context: Context?, private val mDatas: Array<String>) :
+class PrefixAdapter(context: Context?, private var mDatas: Array<String>) :
     RecyclerView.Adapter<PrefixAdapter.SymbolTypeHolder>() {
     private val inflater: LayoutInflater = LayoutInflater.from(context)
     private val textColor: Int = activeTheme.keyTextColor
@@ -25,6 +25,13 @@ class PrefixAdapter(context: Context?, private val mDatas: Array<String>) :
 
     override fun onBindViewHolder(holder: SymbolTypeHolder, position: Int) {
         holder.tvSymbolType.setText(sbc2dbcCase(mDatas[position]))
+    }
+
+    /** 花花：换数据而不换适配器，打字时不必每次重建拼音列表的条目视图 */
+    @android.annotation.SuppressLint("NotifyDataSetChanged")
+    fun setData(datas: Array<String>) {
+        mDatas = datas
+        notifyDataSetChanged()
     }
 
     override fun getItemCount(): Int {

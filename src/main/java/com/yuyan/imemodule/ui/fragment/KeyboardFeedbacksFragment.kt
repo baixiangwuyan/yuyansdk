@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.yuyan.imemodule.R
@@ -135,7 +137,7 @@ class KeyboardFeedbacksFragment : Fragment(){
             gravity = gravityVerticalCenter
         }
 
-        constraintLayout {
+        val feedbackLayout = constraintLayout {
             val lineHeight = dp(48)
             val itemMargin = dp(30)
             add(soundTitle, lParams(matchConstraints, lineHeight) {
@@ -170,6 +172,17 @@ class KeyboardFeedbacksFragment : Fragment(){
                 startOfParent(itemMargin)
                 endOfParent(itemMargin)
             })
+        }
+        // 花花：声音、振动下面加「视觉效果」（按键气泡、按键动效、键内炫光、键缝动效、玻璃）
+        ScrollView(this).apply {
+            isFillViewport = true
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(feedbackLayout, LinearLayout.LayoutParams(matchParent, wrapContent))
+                addView(KeyEffectSettingsUi(context).root, LinearLayout.LayoutParams(matchParent, wrapContent).apply {
+                    topMargin = dp(12)
+                })
+            }, ViewGroup.LayoutParams(matchParent, wrapContent))
         }
     }
 
