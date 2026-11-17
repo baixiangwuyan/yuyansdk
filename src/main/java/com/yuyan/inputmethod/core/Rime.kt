@@ -3,7 +3,6 @@ package com.yuyan.inputmethod.core
 import android.content.Context
 import com.yuyan.imemodule.application.CustomConstant
 import com.yuyan.imemodule.application.Launcher
-import kotlin.system.measureTimeMillis
 
 class Rime(fullCheck: Boolean) {
 
@@ -38,17 +37,17 @@ class Rime(fullCheck: Boolean) {
         }
 
         fun updateStatus() {
-            measureTimeMillis {
-                mStatus = getRimeStatus() ?: RimeStatus()
-            }
+            mStatus = getRimeStatus() ?: RimeStatus()
         }
 
         fun updateContext() {
-            measureTimeMillis {
-                mContext = getRimeContext() ?: RimeContext()
-            }
+            mContext = getRimeContext() ?: RimeContext()
             updateStatus()
         }
+
+        /** 花花：最近一次刷新的上下文（每次改动引擎后都已经刷新过），免得同一键再走一遍 JNI 把 100 个候选重新转成 Java 对象 */
+        @JvmStatic
+        val context: RimeContext? get() = mContext
 
         @JvmStatic
         val isComposing get() = mStatus?.isComposing == true
@@ -102,6 +101,7 @@ class Rime(fullCheck: Boolean) {
         @JvmStatic
         fun setOption(option: String, value: Boolean) {
             setRimeOption(option, value)
+            updateContext()  // 繁简等开关会改候选文字，缓存的上下文跟着刷新
         }
 
         @JvmStatic
@@ -116,7 +116,7 @@ class Rime(fullCheck: Boolean) {
         }
 
         fun chooseAssociate(index: Int): Boolean {
-            return selectRimeAssociate(index)
+            return selectRimeAssociate(index).also { updateContext() }
         }
 
         @JvmStatic

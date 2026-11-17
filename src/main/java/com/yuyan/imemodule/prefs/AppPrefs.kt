@@ -310,6 +310,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val glass = bool("key_effect_glass", false)            // 玻璃效果
         val liquid = bool("key_effect_liquid", false)          // 液态玻璃（需玻璃开着）
         val liquidStrength = string("key_effect_liquid_strength", "standard") // standard/strong/strongest
+        val glowColors = string("key_effect_glow_colors", "vivid")   // 花花：炫光颜色 vivid 多彩 / theme 跟随主题
+        val rainbowBackground = bool("key_effect_rainbow_bg", false) // 花花：彩虹渐变键盘背景，默认关
+        val soundStyle = string("key_sound_style", "cyime")          // 花花：按键音色 cyime（CyIME Rain75 实录，新默认）/ system（花花原声=系统按键音）
     }
 
     private fun <T : ManagedPreferenceProvider> T.register() = this.apply {

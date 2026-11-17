@@ -82,7 +82,7 @@ object RimeEngine {
     fun getNextPageCandidates(): Array<CandidateListItem> {
         return if (Rime.hasRight()) {
             Rime.processKey(keyRecordStack.getRimeKeycodeByName("Page_Down"), 0)
-           val candidates = Rime.getRimeContext()!!.candidates
+           val candidates = Rime.context?.candidates ?: return emptyArray()  // 花花：翻页后已刷新过，用缓存
             for (item in candidates) item.text = applyCase(item.text)
             candidates
         } else emptyArray()
@@ -145,7 +145,7 @@ object RimeEngine {
             showCandidates = emptyList()
             return preCommitText
         }
-        val candidates = Rime.getRimeContext()?.candidates?.asList() ?: emptyList()
+        val candidates = Rime.context?.candidates?.asList() ?: emptyList()  // 花花：按键后 Rime 已经取过一次上下文，直接用，不再走第二遍 JNI
         customPhraseSize = 0
         val compositionText = Rime.compositionText
         showCandidates = when {
@@ -167,8 +167,8 @@ object RimeEngine {
             }
         }
         for (item in showCandidates) item.text = applyCase(item.text)
-        val composition = applyCase(getCurrentComposition(candidates))
         val rimeSchema = Rime.getCurrentRimeSchema()
+        val composition = applyCase(getCurrentComposition(candidates, rimeSchema))
         pinyins = when (rimeSchema) {
             CustomConstant.SCHEMA_ZH_T9 -> {
                 T9PinYinUtils.t9KeyToPinyin(Regex("[A-Z]+").find(compositionText.replace("'", ""))?.value ?: "")
@@ -192,9 +192,8 @@ object RimeEngine {
         return pinyins
     }
 
-    private fun getCurrentComposition(candidates: List<CandidateListItem>): String {
+    private fun getCurrentComposition(candidates: List<CandidateListItem>, rimeSchema: String): String {
         val composition = Rime.compositionText
-        val rimeSchema = Rime.getCurrentRimeSchema()
         if(rimeSchema == CustomConstant.SCHEMA_EN) return ""
         if(composition.isEmpty()) return ""
         if(candidates.isEmpty()) return composition

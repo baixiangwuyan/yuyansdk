@@ -23,7 +23,7 @@ import kotlin.random.Random
 
 internal const val KEY_GLOW_DURATION_MS = 500
 internal const val KEY_CAP_DURATION_MS = 235
-internal const val KEY_GLOW_HOLD_ALPHA = 0.4f
+internal const val KEY_GLOW_HOLD_ALPHA = 0.5f   // 花花：0.4→0.5，按住时颜色更实
 internal const val KEY_GLOW_RELEASE_MS = 180
 private const val GAP_LIGHT_MAX_PULSES = 6
 
@@ -85,6 +85,8 @@ class KeyEffectRenderer(private val density: Float) {
     private class GlowSquare(val x: Float, val y: Float, val side: Float, val angle: Float, val spin: Float)
 
     private class Press(val key: Int, val start: Long, val scale: Float, val color: Int, val squares: Array<GlowSquare>?) {
+        /** 白键上画小方块用的深一点的同色 */
+        val deep: Int = deepen(color)
         var releasedAt = -1L
         var halo: RadialGradient? = null
         var haloW = 0f
@@ -94,14 +96,28 @@ class KeyEffectRenderer(private val density: Float) {
     private val presses = ArrayList<Press>(4)
 
     private var paletteAccent = 0
-    private var palette: IntArray = DEFAULT_GLOW
+    private var themedPalette: IntArray = VIVID_GLOW
+    private var lastColorIndex = -1
 
-    /** 光色跟主题强调色（相邻几种色相）；强调色接近灰时用 CyIME 原来的七彩光。 */
+    /** 「跟随主题」时光色取主题强调色两侧的色相；强调色接近灰时用多彩。 */
     var accentColor: Int = 0xFF8F73E2.toInt()
         set(value) {
             field = value
-            if (value != paletteAccent) { paletteAccent = value; palette = themedGlowPalette(value) ?: DEFAULT_GLOW }
+            if (value != paletteAccent) { paletteAccent = value; themedPalette = themedGlowPalette(value) ?: VIVID_GLOW }
         }
+
+    /** 键帽是浅色（白/浅灰键）：小方块不用 Screen 混合（白底上 Screen 等于看不见），改成普通叠加的深一点的同色。 */
+    var lightKeys: Boolean = true
+
+    /** 花花：每次按键换一个颜色，不和上一次重复（以前随机，常连着几次都是同一类冷色）。 */
+    private fun nextGlowColor(c: KeyEffectConfig): Int {
+        val pal = if (c.glowColors == GlowColors.THEME) themedPalette else VIVID_GLOW
+        if (pal.size == 1) return pal[0]
+        var i = Random.nextInt(pal.size - 1)
+        if (i >= lastColorIndex && lastColorIndex in pal.indices) i++
+        lastColorIndex = i
+        return pal[i]
+    }
 
     /** 按下第 [key] 个键；[delete] 为真时键缝光往里收。 */
     fun press(key: Int, delete: Boolean) {
@@ -119,7 +135,7 @@ class KeyEffectRenderer(private val density: Float) {
                     0.85f + Random.nextFloat() * 0.50f,
                     Random.nextFloat() * 60f - 30f, Random.nextFloat() * 100f - 50f)
             } else null
-            presses += Press(key, t, scale, palette[Random.nextInt(palette.size)], squares)
+            presses += Press(key, t, scale, if (c.glow) nextGlowColor(c) else 0, squares)
         }
         if (c.gap) addPulse(key, delete, c, scale, t)
     }
@@ -154,6 +170,7 @@ class KeyEffectRenderer(private val density: Float) {
     }
 
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val squarePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val screenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN) }
     private val tmpRect = RectF()
 
@@ -183,12 +200,12 @@ class KeyEffectRenderer(private val density: Float) {
         } else {
             val fade = keyGlowRemaining(t)
             val travel = keyGlowTravel(t)
-            glowPaint.alpha = (max(fade * 0.75f, hold) * 255).toInt()
+            glowPaint.alpha = (max(fade * (if (lightKeys) GLOW_FILL_LIGHT else GLOW_FILL_DARK), hold) * 255).toInt()
             canvas.drawRect(cap, glowPaint)
             // 光晕：只有它用渐变，按下时按键大小建一次。
             if (p.halo == null || p.haloW != w || p.haloH != h) {
                 p.halo = RadialGradient(0f, 0f, max(w, h).coerceAtLeast(1f) * 0.8f,
-                    intArrayOf(withAlpha(p.color, 0.25f), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+                    intArrayOf(withAlpha(p.color, 0.4f), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
                 p.haloW = w; p.haloH = h
             }
             val gx = cap.left + w * 0.5f
@@ -211,10 +228,17 @@ class KeyEffectRenderer(private val density: Float) {
                     val edge = side * layer * 0.015f
                     val extent = side + edge * 2f
                     tmpRect.set(cx - extent / 2f, cy - extent / 2f, cx + extent / 2f, cy + extent / 2f)
-                    screenPaint.color = p.color
-                    screenPaint.alpha = (fade * (if (layer == 0) 0.22f else 0.035f) * 255).toInt()
                     val r = side * 0.09f + edge
-                    canvas.drawRoundRect(tmpRect, r, r, screenPaint)
+                    if (lightKeys) {
+                        // 白键上：普通叠加更深一点的同色，方块看得见
+                        squarePaint.color = p.deep
+                        squarePaint.alpha = (fade * (if (layer == 0) 0.30f else 0.06f) * 255).toInt()
+                        canvas.drawRoundRect(tmpRect, r, r, squarePaint)
+                    } else {
+                        screenPaint.color = p.color
+                        screenPaint.alpha = (fade * (if (layer == 0) 0.32f else 0.05f) * 255).toInt()
+                        canvas.drawRoundRect(tmpRect, r, r, screenPaint)
+                    }
                 }
                 canvas.restore()
             }
@@ -422,10 +446,33 @@ class KeyEffectRenderer(private val density: Float) {
     }
 
     companion object {
-        private val DEFAULT_GLOW = intArrayOf(
-            0xFF83E8AC.toInt(), 0xFFFFD58F.toInt(), 0xFF9C9AEC.toInt(),
-            0xFFB19BCC.toInt(), 0xFFEFACD2.toInt(), 0xFFD9ED8B.toInt(), 0xFF89E9D0.toInt(),
+        /**
+         * 花花「多彩」调色盘：CyIME 七彩光（黄、桃、青柠、薰衣草紫、粉、绿、青）的色相，
+         * 饱和度提高一截（原来 HSV 饱和度约 .35～.45，叠在白灰键上发淡），并补了橙、天蓝，冷暖各半。
+         */
+        val VIVID_GLOW = intArrayOf(
+            0xFFFFD23F.toInt(), // 柠檬黄
+            0xFFFF9E80.toInt(), // 桃
+            0xFFB8E83C.toInt(), // 青柠
+            0xFFAE8CFF.toInt(), // 薰衣草紫
+            0xFFFF7FBF.toInt(), // 粉
+            0xFF4FDC8A.toInt(), // 绿
+            0xFFFFB347.toInt(), // 橙
+            0xFF5BC6FF.toInt(), // 天蓝
+            0xFF3FE0D0.toInt(), // 青
         )
+        /** 炫光底色的不透明度：浅色键 0.85（原 0.75），深色键 0.65（白字上不刺眼） */
+        const val GLOW_FILL_LIGHT = 0.85f
+        const val GLOW_FILL_DARK = 0.65f
+
+        /** 饱和度 +0.15、明度 -0.12 的同色 */
+        fun deepen(color: Int): Int {
+            val hsv = FloatArray(3)
+            Color.colorToHSV(color, hsv)
+            hsv[1] = (hsv[1] + .15f).coerceAtMost(1f)
+            hsv[2] = (hsv[2] - .12f).coerceAtLeast(0f)
+            return Color.HSVToColor(hsv)
+        }
 
         private fun withAlpha(color: Int, alpha: Float): Int =
             (color and 0x00FFFFFF) or ((alpha.coerceIn(0f, 1f) * 255).toInt() shl 24)
@@ -435,7 +482,7 @@ class KeyEffectRenderer(private val density: Float) {
             val hsv = FloatArray(3)
             Color.colorToHSV(accent, hsv)
             if (hsv[1] < .15f) return null
-            val saturation = hsv[1].coerceIn(.35f, .55f)
+            val saturation = hsv[1].coerceIn(.55f, .75f)   // 花花：原 .35～.55，太淡
             return floatArrayOf(0f, -20f, 20f, -40f, 40f).map { shift ->
                 Color.HSVToColor(floatArrayOf((hsv[0] + shift + 360f) % 360f, saturation, .96f))
             }.toIntArray()

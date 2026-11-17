@@ -32,7 +32,7 @@ class KeyEffectPreviewView(context: Context) : FrameLayout(context) {
 
     fun refreshTheme() {
         val theme = ThemeManager.activeTheme
-        keys.background = runCatching { theme.backgroundDrawable(ThemeManager.prefs.keyBorder.getValue()) }.getOrNull()
+        keys.background = runCatching { KeyboardBackground.of(theme, ThemeManager.prefs.keyBorder.getValue()) }.getOrNull()
         keys.setTheme(theme)
     }
 

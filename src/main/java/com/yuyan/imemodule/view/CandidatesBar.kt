@@ -289,7 +289,7 @@ class CandidatesBar(context: Context?, attrs: AttributeSet?) : RelativeLayout(co
             mRightArrowBtn.drawable.setLevel(0)
             showViewVisibility(mCandidatesMenuContainer)
             val mFunItems: MutableList<SkbFunItem> = mutableListOf()
-            val barMenus = DataBaseKT.instance.skbFunDao().getALlBarMenu()
+            val barMenus = com.yuyan.imemodule.database.PhraseCache.barMenus()  // 花花：内存缓存
             for (item in barMenus) {
                 val skbMenuMode = SkbMenuMode.decode(item.name)
                 val skbFunItem = menuSkbFunsPreset[skbMenuMode]
@@ -305,8 +305,10 @@ class CandidatesBar(context: Context?, attrs: AttributeSet?) : RelativeLayout(co
         }
         activeCandNo = 0
         mCandidatesAdapter.activeCandidates(activeCandNo)
-        mCandidatesAdapter.notifyChanged()
-        mCandidatesMenuAdapter.notifyChanged()
+        // 花花：只刷新正在显示的那一栏。以前打每个字都把藏着的工具栏也 notifyDataSetChanged 一遍，
+        // 白白多一次向上冒泡的 requestLayout；藏着的那栏下次显示时这里会再刷新。
+        if (mCandidatesDataContainer.visibility == VISIBLE) mCandidatesAdapter.notifyChanged()
+        if (mCandidatesMenuContainer.visibility == VISIBLE) mCandidatesMenuAdapter.notifyChanged()
     }
 
     /**

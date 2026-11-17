@@ -187,6 +187,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         if (effects.gap || effects.motion || effects.glow) {
             if (!keyEffectsLaidOut) layoutKeyEffects(softKeyboard, keyXMargin, keyYMargin)
             keyEffects.accentColor = mActiveTheme.accentKeyBackgroundColor
+            keyEffects.lightKeys = androidx.core.graphics.ColorUtils.calculateLuminance(mActiveTheme.keyBackgroundColor) > 0.5
             keyEffects.translucentCaps = glass || !isKeyBorder
             keyEffects.drawUnderKeys(canvas, width, height, mActiveTheme.accentKeyBackgroundColor)
         }
@@ -241,6 +242,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             layoutKeyEffects(softKeyboard, softKeyboard.keyXMargin, keyYMargin)
         }
         keyEffects.accentColor = mActiveTheme.accentKeyBackgroundColor
+        keyEffects.lightKeys = androidx.core.graphics.ColorUtils.calculateLuminance(mActiveTheme.keyBackgroundColor) > 0.5
         val index = keyIndexOf(key)
         if (index >= 0) keyEffects.press(index, key.code == KeyEvent.KEYCODE_DEL)
     }

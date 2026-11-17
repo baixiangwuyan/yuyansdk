@@ -36,6 +36,7 @@ import splitties.views.gravityVerticalCenter
 class KeyboardFeedbacksFragment : Fragment(){
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View = with(requireContext()) {
 
+        com.yuyan.imemodule.prefs.InputFeedbacks.preloadSounds()  // 花花：试听时第一下就是选中的音色
         val soundOnKeyPress by AppPrefs.getInstance().internal.soundOnKeyPress
         val vibrationAmplitude by AppPrefs.getInstance().internal.vibrationAmplitude
 

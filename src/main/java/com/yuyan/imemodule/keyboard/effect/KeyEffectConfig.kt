@@ -14,6 +14,16 @@ enum class GapLightStyle(val id: String, val title: String) {
     }
 }
 
+/** 键内炫光的颜色；[id] 存进设置里。 */
+enum class GlowColors(val id: String, val title: String) {
+    VIVID("vivid", "多彩"),
+    THEME("theme", "跟随主题");
+
+    companion object {
+        fun of(id: String?): GlowColors = entries.firstOrNull { it.id == id } ?: VIVID
+    }
+}
+
 /**
  * 花花「按键效果」里的视觉效果设置快照。
  *
@@ -43,6 +53,10 @@ class KeyEffectConfig(
     /** 液态玻璃只在玻璃开着时生效。 */
     val liquid: Boolean,
     val liquidStrength: LiquidGlassStrength,
+    /** 键内炫光颜色：多彩（每次换色）/ 跟随主题 */
+    val glowColors: GlowColors = GlowColors.VIVID,
+    /** 彩虹渐变键盘背景（自定义背景图的主题不换） */
+    val rainbowBackground: Boolean = false,
 ) {
     /** 有没有需要逐帧推进的动画效果。 */
     val anyAnimated: Boolean get() = motion || glow || gap
@@ -122,6 +136,8 @@ object KeyEffects {
             glass = k.glass.getValue(),
             liquid = k.glass.getValue() && k.liquid.getValue(),
             liquidStrength = LiquidGlassStrength.of(k.liquidStrength.getValue()),
+            glowColors = GlowColors.of(k.glowColors.getValue()),
+            rainbowBackground = k.rainbowBackground.getValue(),
         )
         cached = c
         return c

@@ -1,6 +1,5 @@
 package com.yuyan.inputmethod
 
-import com.yuyan.imemodule.database.DataBaseKT
 import com.yuyan.imemodule.utils.StringUtils
 import com.yuyan.imemodule.utils.TimeUtils
 import com.yuyan.imemodule.libs.expression.ExpressionBuilder
@@ -56,7 +55,7 @@ object CustomEngine {
         val phrases = mutableListOf<String>()
         val chinesePredictionDate = getInstance().input.chinesePredictionDate.getValue()
         if(chinesePredictionDate) {
-            phrases.addAll(DataBaseKT.instance.phraseDao().query(text).map { it.content })
+            phrases.addAll(com.yuyan.imemodule.database.PhraseCache.phrasesFor(text))  // 花花：内存缓存，不再每键在主线程查库
             val suffixesDate = setOf("rq", "riqi", "PGPG", "PP")
             if (suffixesDate.any { it == text }) {
                 phrases.addAll(TimeUtils.getData())

@@ -11,6 +11,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.widget.SwitchCompat
 import com.yuyan.imemodule.keyboard.effect.GapLightStyle
+import com.yuyan.imemodule.keyboard.effect.GlowColors
 import com.yuyan.imemodule.keyboard.effect.KeyEffectConfig
 import com.yuyan.imemodule.keyboard.effect.KeyEffectPreviewView
 import com.yuyan.imemodule.keyboard.effect.LiquidGlassStrength
@@ -34,7 +35,17 @@ class KeyEffectSettingsUi(private val ctx: Context) {
 
     val root: LinearLayout = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
 
+    private val glowDetails = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+
     init {
+        // 花花：按键音色（声音开关和音量在上面）
+        root.addView(header("按键音色"))
+        root.addView(choices(listOf("cyime" to "CyIME 风格", "system" to "花花原声"), k.soundStyle) {
+            com.yuyan.imemodule.prefs.InputFeedbacks.preloadSounds()
+            com.yuyan.imemodule.utils.DevicesUtils.tryPlayKeyDown()
+        })
+        root.addView(hint("CyIME 风格：机械键盘实录（Rain75 紫薇轴，来自开源输入法 CyIME，GPL-3.0）；花花原声：系统按键音"))
+
         root.addView(header("视觉效果"))
         root.addView(hint("在下面的小键盘上按一下试试"))
         root.addView(preview, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -42,7 +53,17 @@ class KeyEffectSettingsUi(private val ctx: Context) {
         })
         root.addView(switchRow("按键气泡", "按下字符键时在上方弹出放大的字", prefs.keyboardSetting.keyboardBalloonShow))
         root.addView(switchRow("按键动效", "按下时键帽缩小再回弹", k.motion))
-        root.addView(switchRow("键内炫光", "按下时键里闪过半秒的渐变光", k.glow))
+        root.addView(switchRow("键内炫光", "按下时键里闪过半秒的渐变光，每次换一个颜色", k.glow) { on ->
+            glowDetails.visibility = if (on) View.VISIBLE else View.GONE
+        })
+        glowDetails.addView(label("炫光颜色"))
+        glowDetails.addView(choices(GlowColors.entries.map { it.id to it.title }, k.glowColors))
+        glowDetails.addView(hint("多彩：黄、桃、青柠、紫、粉、绿、橙、天蓝、青轮换；跟随主题：主题强调色附近的颜色"))
+        root.addView(glowDetails)
+        glowDetails.visibility = if (k.glow.getValue()) View.VISIBLE else View.GONE
+        root.addView(switchRow("彩虹渐变背景", "键盘底换成粉、紫、蓝、青绿的柔和渐变，炫光更艳；浅色、深色主题各有一套；用了自定义背景图的主题不换", k.rainbowBackground) {
+            preview.refreshTheme()
+        })
         root.addView(switchRow("键缝动效", "光线沿键缝从按下的键往外走，删除时往回收；颜色跟随主题", k.gap) { on ->
             gapDetails.visibility = if (on) View.VISIBLE else View.GONE
         })
@@ -129,7 +150,8 @@ class KeyEffectSettingsUi(private val ctx: Context) {
         }
     }
 
-    private fun choices(items: List<Pair<String, String>>, pref: ManagedPreference.PString): View {
+    private fun choices(items: List<Pair<String, String>>, pref: ManagedPreference.PString,
+                        onChanged: ((String) -> Unit)? = null): View {
         val group = RadioGroup(ctx).apply {
             orientation = RadioGroup.HORIZONTAL
             setPadding(margin - ctx.dp(6), 0, margin, ctx.dp(4))
@@ -148,6 +170,7 @@ class KeyEffectSettingsUi(private val ctx: Context) {
             val id = g.findViewById<RadioButton>(checkedId)?.tag as? String ?: return@setOnCheckedChangeListener
             pref.setValue(id)
             preview.refresh()
+            onChanged?.invoke(id)
         }
         return group
     }

@@ -251,12 +251,16 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
         return false
     }
 
+    /** 花花：上次铺背景时彩虹背景开没开；在设置里切换后，下次弹键盘重铺 */
+    private var appliedRainbow: Boolean? = null
+
     override fun updateTheme() {
+        appliedRainbow = com.yuyan.imemodule.keyboard.effect.KeyboardBackground.rainbowEnabled()
         setBackgroundResource(android.R.color.transparent)
         val activeTheme = ThemeManager.activeTheme
         val keyTextColor = activeTheme.keyTextColor
         val env = EnvironmentSingleton.instance
-        val background = activeTheme.backgroundDrawable(ThemeManager.prefs.keyBorder.getValue())
+        val background = com.yuyan.imemodule.keyboard.effect.KeyboardBackground.of(activeTheme, ThemeManager.prefs.keyBorder.getValue())  // 花花：可选彩虹渐变底
         if (background is BitmapDrawable) {
             val scaledBitmap = background.bitmap.scale(env.skbWidth, env.inputAreaHeight)
             mSkbRoot.background = scaledBitmap.toDrawable(context.resources).apply {
@@ -783,6 +787,11 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
 
     override fun onWindowShown() {
         chinesePrediction = appPrefs.input.chinesePrediction.getValue()
+        // 花花：后台把被系统挤出缓存的语法模型/词库页读回来，常用语和工具栏读进内存（都不占主线程）
+        com.yuyan.imemodule.service.EngineLoader.rewarmAsync()
+        com.yuyan.imemodule.database.PhraseCache.preloadIfNeeded()
+        com.yuyan.imemodule.prefs.InputFeedbacks.preloadSounds()
+        if (appliedRainbow != null && appliedRainbow != com.yuyan.imemodule.keyboard.effect.KeyboardBackground.rainbowEnabled()) updateTheme()
         // 在设置页切换了全屏手写：重建手写键盘布局
         if (KeyboardLoaderUtil.instance.refreshHandwritingIfChanged()) {
             KeyboardLoaderUtil.instance.clearKeyboardMap()

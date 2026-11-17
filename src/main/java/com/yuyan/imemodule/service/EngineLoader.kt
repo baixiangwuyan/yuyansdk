@@ -96,6 +96,45 @@ object EngineLoader {
         RimeEngine.setImeOption("emoji", input.emojiInput.getValue())
     }
 
+    @Volatile private var lastWarm = 0L
+    private val warmRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * 花花：键盘每次弹出时（最多 30 秒一次）在后台把语法模型和主词库的页“摸”一遍。
+     * 切到别的应用一阵后系统会把 39MB 的 bgw 语法模型和 68MB 的词库页从缓存里挤掉，
+     * 回来打第一个字时 librime 在主线程上缺页读盘，一卡就是两三百毫秒（主机实测：缓存冷时
+     * 头几个键 100/58/249ms、最慢 495ms；缓存热时 0.3ms）。这里用 mmap+load 只碰每页一个字节，
+     * 页本来就在缓存里时几毫秒就完；不复制数据，不改引擎，不影响候选。
+     */
+    fun rewarmAsync() {
+        if (!ready) return
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastWarm < 30_000) return
+        if (!warmRunning.compareAndSet(false, true)) return
+        lastWarm = now
+        Thread({
+            try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+                touchHotFiles()
+            } finally { warmRunning.set(false) }
+        }, "huahua-rewarm").start()
+    }
+
+    private fun touchHotFiles() {
+        runCatching {
+            val root = File(CustomConstant.RIME_DICT_PATH)
+            val schema = currentSchemaGuess()
+            val hot = root.listFiles().orEmpty().filter { it.isFile && it.name.endsWith(".gram") } +
+                listOf(File(root, "build/pinyin.table.bin"), File(root, "build/$schema.prism.bin"))
+            for (f in hot) {
+                if (!f.isFile || f.length() <= 0) continue
+                java.io.RandomAccessFile(f, "r").use { raf ->
+                    raf.channel.map(java.nio.channels.FileChannel.MapMode.READ_ONLY, 0, f.length()).load()
+                }
+            }
+        }
+    }
+
     /** 把词库、语法模型顺序读一遍（librime 用 mmap，读过的页留在系统缓存里） */
     private fun warmFileCache() {
         runCatching {
@@ -108,6 +147,7 @@ object EngineLoader {
                 if (budget <= 0) break
                 f.inputStream().use { s -> while (true) { val n = s.read(buf); if (n <= 0) break; budget -= n } }
             }
+            lastWarm = android.os.SystemClock.uptimeMillis()
         }
     }
 }
