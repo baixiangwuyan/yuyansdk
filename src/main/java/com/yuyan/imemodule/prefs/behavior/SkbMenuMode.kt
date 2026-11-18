@@ -36,7 +36,8 @@ enum class SkbMenuMode {
     Emoticon,
     LockClipBoard,
     TextEdit,
-    VoiceInput;  // 花花：离线语音输入
+    VoiceInput,  // 花花：离线语音输入
+    Glass;       // 花花：玻璃效果开关
 
     companion object : ManagedPreference.StringLikeCodec<SkbMenuMode> {
         override fun decode(raw: String): SkbMenuMode =

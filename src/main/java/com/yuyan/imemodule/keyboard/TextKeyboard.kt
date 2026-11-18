@@ -12,6 +12,7 @@ import com.yuyan.imemodule.keyboard.effect.FrostedBackdrop
 import com.yuyan.imemodule.keyboard.effect.KeyEffectConfig
 import com.yuyan.imemodule.keyboard.effect.KeyEffectRenderer
 import com.yuyan.imemodule.keyboard.effect.KeyEffects
+import com.yuyan.imemodule.keyboard.effect.LiquidGlassStrength
 import com.yuyan.imemodule.keyboard.effect.LiquidRim
 import android.graphics.Rect
 import android.graphics.Typeface
@@ -285,7 +286,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
     }
 
     /** 键帽底色。玻璃关着时和原来一模一样（同样的圆角矩形、同样的颜色）。 */
-    private fun drawCap(canvas: Canvas, color: Int, glass: Boolean, effects: KeyEffectConfig, pressed: Boolean) {
+    private fun drawCap(canvas: Canvas, color: Int, glass: Boolean, effects: KeyEffectConfig, pressed: Boolean, plainRim: Boolean = false) {
         val radius = keyRadius.toFloat()
         if (!glass) {
             capPaint.shader = null
@@ -297,6 +298,8 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         // 立体亮边、阴影、边厚度照旧只叠在边上。键面不透明后毛玻璃底图看不见，不再画。
         val hasImage = frosted.available
         val w = keyCap.width(); val h = keyCap.height()
+        // 花花：换行键、拼音9键（空格）等彩色/功能键三档都用「标准」的干净样子，白色字母键照旧随档位。
+        val strength = if (plainRim) LiquidGlassStrength.STANDARD else effects.liquidStrength
         capPaint.shader = null
         capPaint.color = color
         canvas.drawRoundRect(keyCap, radius, radius, capPaint)
@@ -304,7 +307,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             // 键边折射画在键面上面，按以前半透明键面（有背景图时 0.5）盖过的程度减淡，边上看起来和原来一样。
             val save = canvas.save()
             canvas.translate(keyCap.left, keyCap.top)
-            frosted.drawRefraction(canvas, keyCap.left, keyCap.top, w, h, radius, effects.liquidStrength,
+            frosted.drawRefraction(canvas, keyCap.left, keyCap.top, w, h, radius, strength,
                 resources.displayMetrics.density, 1f - Color.alpha(color) / 255f * 0.5f)
             canvas.restoreToCount(save)
         }
@@ -312,7 +315,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             val save = canvas.save()
             canvas.translate(keyCap.left, keyCap.top)
             val dark = ColorUtils.calculateLuminance(mActiveTheme.keyBackgroundColor or (0xFF shl 24)) < 0.5
-            liquidRim.draw(canvas, w, h, radius, dark, effects.liquidStrength, resources.displayMetrics.density, pressed)
+            liquidRim.draw(canvas, w, h, radius, dark, strength, resources.displayMetrics.density, pressed)
             canvas.restoreToCount(save)
         } else {
             // 毛玻璃的一道淡淡的亮边。
@@ -340,8 +343,9 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         keyCap.set((softKey.mLeft + keyXMargin).toFloat(), (softKey.mTop + keyYMargin).toFloat(),
             (softKey.mRight - keyXMargin).toFloat(), (softKey.mBottom - keyYMargin).toFloat())
         val pressedLook = softKey.pressed || (mService?.hasSelection == true && softKey.code == InputModeSwitcher.USER_KEYCODE_SELECT_MODE)
+        val plainRim = softKey.code == KeyEvent.KEYCODE_ENTER || softKey.code == KeyEvent.KEYCODE_SPACE
         if (pressedLook) {
-            drawCap(canvas, mActiveTheme.keyPressHighlightColor, glass, effects, true)
+            drawCap(canvas, mActiveTheme.keyPressHighlightColor, glass, effects, true, plainRim)
         } else if (isKeyBorder) {
             val background = when (softKey.code) {
                 KeyEvent.KEYCODE_ENTER -> mActiveTheme.accentKeyBackgroundColor
@@ -349,7 +353,7 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
                 KeyEvent.KEYCODE_AT -> if (AppPrefs.getInstance().input.chineseFanTi.getValue()) mActiveTheme.accentKeyBackgroundColor else mActiveTheme.keyBackgroundColor
                 else  -> mActiveTheme.keyBackgroundColor
             }
-            drawCap(canvas, background, glass, effects, false)
+            drawCap(canvas, background, glass, effects, false, plainRim || background != mActiveTheme.keyBackgroundColor)
         } else if(softKey.code == KeyEvent.KEYCODE_ENTER) {
                capPaint.shader = null
                capPaint.color = mActiveTheme.accentKeyBackgroundColor

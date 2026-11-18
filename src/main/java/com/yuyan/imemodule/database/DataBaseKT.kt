@@ -20,7 +20,7 @@ import com.yuyan.imemodule.prefs.behavior.SkbMenuMode
 import com.yuyan.imemodule.utils.thread.ThreadPoolUtils
 
 //@Database(entities = [SideSymbol::class, Clipboard::class, UsedSymbol::class], version = 1, exportSchema = false)
-@Database(entities = [SideSymbol::class, Clipboard::class, UsedSymbol::class, Phrase::class, SkbFun::class], version = 5, exportSchema = false)
+@Database(entities = [SideSymbol::class, Clipboard::class, UsedSymbol::class, Phrase::class, SkbFun::class], version = 6, exportSchema = false)
 abstract class DataBaseKT : RoomDatabase() {
     abstract fun sideSymbolDao(): SideSymbolDao
     abstract fun clipboardDao(): ClipboardDao
@@ -55,12 +55,25 @@ abstract class DataBaseKT : RoomDatabase() {
             }
         }
 
+        // 花花：键盘菜单加「玻璃」开关，放在常用语的位置，常用语及后面的往后挪一格（没有常用语就排最后）
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                var pos = -1
+                db.query("SELECT position FROM skbfun WHERE name = 'Phrases' AND isKeep = 0").use { if (it.moveToFirst()) pos = it.getInt(0) }
+                if (pos < 0) db.query("SELECT IFNULL(MAX(position), -1) + 1 FROM skbfun WHERE isKeep = 0").use { if (it.moveToFirst()) pos = it.getInt(0) }
+                if (pos < 0) pos = 0
+                db.execSQL("UPDATE skbfun SET position = position + 1 WHERE isKeep = 0 AND position >= $pos")
+                db.execSQL("INSERT OR IGNORE INTO skbfun (name, isKeep, position) VALUES ('Glass', 0, $pos)")
+            }
+        }
+
         val instance = Room.databaseBuilder(Launcher.instance.context, DataBaseKT::class.java, "ime_db")
             .allowMainThreadQueries()
             .addMigrations(MIGRATION_1_2)
             .addMigrations(MIGRATION_2_3)
             .addMigrations(MIGRATION_3_4)
             .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_5_6)
             .addCallback(object :Callback(){
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)
@@ -108,19 +121,20 @@ abstract class DataBaseKT : RoomDatabase() {
                     SkbFun(name = SkbMenuMode.SwitchKeyboard.name, isKeep = 0, position = 1),
                     SkbFun(name = SkbMenuMode.KeyboardHeight.name, isKeep = 0, position = 2),
                     SkbFun(name = SkbMenuMode.ClipBoard.name, isKeep = 0, position = 3),
-                    SkbFun(name = SkbMenuMode.Phrases.name, isKeep = 0, position = 4),
-                    SkbFun(name = SkbMenuMode.DarkTheme.name, isKeep = 0, position = 5),
-                    SkbFun(name = SkbMenuMode.Feedback.name, isKeep = 0, position = 6),
-                    SkbFun(name = SkbMenuMode.OneHanded.name, isKeep = 0, position = 7),
-                    SkbFun(name = SkbMenuMode.NumberRow.name, isKeep = 0, position = 8),
-                    SkbFun(name = SkbMenuMode.JianFan.name, isKeep = 0, position = 9),
-                    SkbFun(name = SkbMenuMode.Mnemonic.name, isKeep = 0, position = 10),
-                    SkbFun(name = SkbMenuMode.FloatKeyboard.name, isKeep = 0, position = 11),
-                    SkbFun(name = SkbMenuMode.FlowerTypeface.name, isKeep = 0, position = 12),
-                    SkbFun(name = SkbMenuMode.Custom.name, isKeep = 0, position = 13),
-                    SkbFun(name = SkbMenuMode.Settings.name, isKeep = 0, position = 14),
-                    SkbFun(name = SkbMenuMode.TextEdit.name, isKeep = 0, position = 15),
-                    SkbFun(name = SkbMenuMode.VoiceInput.name, isKeep = 0, position = 16),
+                    SkbFun(name = SkbMenuMode.Glass.name, isKeep = 0, position = 4),
+                    SkbFun(name = SkbMenuMode.Phrases.name, isKeep = 0, position = 5),
+                    SkbFun(name = SkbMenuMode.DarkTheme.name, isKeep = 0, position = 6),
+                    SkbFun(name = SkbMenuMode.Feedback.name, isKeep = 0, position = 7),
+                    SkbFun(name = SkbMenuMode.OneHanded.name, isKeep = 0, position = 8),
+                    SkbFun(name = SkbMenuMode.NumberRow.name, isKeep = 0, position = 9),
+                    SkbFun(name = SkbMenuMode.JianFan.name, isKeep = 0, position = 10),
+                    SkbFun(name = SkbMenuMode.Mnemonic.name, isKeep = 0, position = 11),
+                    SkbFun(name = SkbMenuMode.FloatKeyboard.name, isKeep = 0, position = 12),
+                    SkbFun(name = SkbMenuMode.FlowerTypeface.name, isKeep = 0, position = 13),
+                    SkbFun(name = SkbMenuMode.Custom.name, isKeep = 0, position = 14),
+                    SkbFun(name = SkbMenuMode.Settings.name, isKeep = 0, position = 15),
+                    SkbFun(name = SkbMenuMode.TextEdit.name, isKeep = 0, position = 16),
+                    SkbFun(name = SkbMenuMode.VoiceInput.name, isKeep = 0, position = 17),
                 )
                 instance.skbFunDao().insertAll(skbFuns)
             }

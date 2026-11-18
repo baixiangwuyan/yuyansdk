@@ -151,6 +151,13 @@ fun onSettingsMenuClick(inputView: InputView, skbMenuMode: SkbMenuMode) {
                 inputView.updateCandidateBar()
             }
         }
+        SkbMenuMode.Glass -> {  // 花花：玻璃效果开关，与设置页「玻璃效果」同一个开关
+            val glass = AppPrefs.getInstance().keyEffect.glass
+            val on = !glass.getValue()
+            glass.setValue(on)
+            android.widget.Toast.makeText(Launcher.instance.context, if (on) "玻璃效果已开" else "玻璃效果已关", android.widget.Toast.LENGTH_SHORT).show()
+            KeyboardManager.instance.switchKeyboard()
+        }
         SkbMenuMode.TextEdit -> {
             InputModeSwitcher.switchModeForUserKey(
                 if(InputModeSwitcher.isTextEditSkb) InputModeSwitcher.USER_KEYCODE_RETURN
@@ -158,4 +165,17 @@ fun onSettingsMenuClick(inputView: InputView, skbMenuMode: SkbMenuMode) {
         }
         else ->{}
     }
+}
+
+/** 花花：长按菜单「玻璃」轮换液态玻璃强度（标准→加强→最强），同时打开玻璃和液态玻璃。 */
+fun cycleGlassStrength(context: android.content.Context) {
+    val k = AppPrefs.getInstance().keyEffect
+    val entries = com.yuyan.imemodule.keyboard.effect.LiquidGlassStrength.entries
+    val current = com.yuyan.imemodule.keyboard.effect.LiquidGlassStrength.of(k.liquidStrength.getValue())
+    val next = if (k.glass.getValue() && k.liquid.getValue()) entries[(current.ordinal + 1) % entries.size] else current
+    k.liquidStrength.setValue(next.id)
+    k.glass.setValue(true)
+    k.liquid.setValue(true)
+    android.widget.Toast.makeText(context, "玻璃：" + next.label, android.widget.Toast.LENGTH_SHORT).show()
+    KeyboardManager.instance.switchKeyboard()
 }

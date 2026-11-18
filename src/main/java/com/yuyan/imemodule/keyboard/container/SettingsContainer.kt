@@ -18,6 +18,7 @@ import com.yuyan.imemodule.manager.InputModeSwitcher
 import com.yuyan.imemodule.prefs.AppPrefs
 import com.yuyan.imemodule.prefs.behavior.DoublePinyinSchemaMode
 import com.yuyan.imemodule.prefs.behavior.SkbMenuMode
+import com.yuyan.imemodule.keyboard.cycleGlassStrength
 import com.yuyan.imemodule.singleton.EnvironmentSingleton
 import com.yuyan.imemodule.keyboard.InputView
 import com.yuyan.imemodule.manager.layout.CustomGridLayoutManager
@@ -65,6 +66,9 @@ class SettingsContainer(context: Context, inputView: InputView) : BaseContainer(
         adapter = MenuAdapter(context, funItems)
         adapter?.setOnItemClickLitener { _: RecyclerView.Adapter<*>?, _: View?, position: Int ->
             inputView.onSettingsMenuClick(funItems[position].skbMenuMode)
+        }
+        adapter?.onItemLongClick = { item ->
+            if (item.skbMenuMode == SkbMenuMode.Glass) { cycleGlassStrength(context); true } else false
         }
         mRVMenuLayout!!.setAdapter(adapter)
     }

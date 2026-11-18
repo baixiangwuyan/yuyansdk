@@ -34,6 +34,8 @@ class MenuAdapter (context: Context?, val data: MutableList<SkbFunItem>) : Recyc
     }
 
     var dragOverListener: DragOverListener? = null
+    /** 花花：长按回调（返回 true 表示已处理），目前只给「玻璃」换档用。 */
+    var onItemLongClick: ((SkbFunItem) -> Boolean)? = null
     init {
         val theme = ThemeManager.activeTheme
         textColor = theme.keyTextColor
@@ -95,6 +97,7 @@ class MenuAdapter (context: Context?, val data: MutableList<SkbFunItem>) : Recyc
                 return@setOnTouchListener false
             }
             holder.itemView.setOnClickListener(null)
+            holder.itemView.setOnLongClickListener(null)
         } else {
             holder.entranceOption?.visibility = View.GONE
             if (mOnItemClickListener != null) {
@@ -102,6 +105,9 @@ class MenuAdapter (context: Context?, val data: MutableList<SkbFunItem>) : Recyc
                     mOnItemClickListener!!.onItemClick(this, v, position)
                 }
             }
+            val longClick = onItemLongClick
+            if (longClick != null) holder.itemView.setOnLongClickListener { longClick(item) }
+            else holder.itemView.setOnLongClickListener(null)
         }
     }
 
@@ -119,6 +125,7 @@ class MenuAdapter (context: Context?, val data: MutableList<SkbFunItem>) : Recyc
             SkbMenuMode.OneHanded -> AppPrefs.getInstance().keyboardSetting.oneHandedModSwitch.getValue()
             SkbMenuMode.FlowerTypeface -> CustomConstant.flowerTypeface != FlowerTypefaceMode.Disabled
             SkbMenuMode.FloatKeyboard -> EnvironmentSingleton.instance.keyboardModeFloat
+            SkbMenuMode.Glass -> AppPrefs.getInstance().keyEffect.glass.getValue()
             // Keyboard Menu
             SkbMenuMode.PinyinT9 -> rimeValue == CustomConstant.SCHEMA_ZH_T9
             SkbMenuMode.Pinyin26Jian -> rimeValue == CustomConstant.SCHEMA_ZH_QWERTY
