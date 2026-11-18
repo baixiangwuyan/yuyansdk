@@ -85,7 +85,8 @@ class KeyBubbleView(context: Context) : View(context) {
         // 键色带透明度（透明主题）时气泡改用长按弹窗的底色，保证看得清。
         fill.color = if (Color.alpha(bg) < 0xF0) theme.popupBackgroundColor or (0xFF shl 24) else bg
         text.color = theme.keyTextColor
-        pointer.color = (theme.accentKeyBackgroundColor and 0x00FFFFFF) or (0x99 shl 24)
+        // 花花：小三角统一用各主题的功能键底色（拼音9键那种灰），不透明。
+        pointer.color = theme.functionKeyBackgroundColor or (0xFF shl 24)
         text.textSize = 20f * density * scale * resources.configuration.fontScale.coerceIn(0.85f, 1.3f)
         val bodyH = 40f * density * scale
         val bodyW = max(text.measureText(label ?: "") + 20f * density * scale, bodyH)

@@ -62,13 +62,14 @@ private fun black(alpha: Float) = Color.argb((alpha.coerceIn(0f, 1f) * 255f).toI
 
 /**
  * 一个键的液态玻璃亮边。按键大小不变就复用（同一行的键大多同样大），不每帧新建渐变。
- * 朝光的左上亮，对角右下一道弱一些的回光；加强、最强两档多一圈厚度和键面上半的淡高光。
+ * 朝光的左上亮，对角右下一道弱一些的回光；加强、最强两档多一圈厚度和沿键边的淡高光（花花：不再盖键面中间）。
  */
 class LiquidRim {
     private val path = Path()
     private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val bandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private var sheenWidths = FloatArray(0)
     private val heldPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var keyW = -1f
     private var keyH = -1f
@@ -105,9 +106,17 @@ class LiquidRim {
             // 画的时候裁在 path 里面，每圈只露出里面一半：最宽的一圈正好 band 宽。
             bandWidths = FloatArray(LIQUID_BAND_STEPS) { band * 2f * (LIQUID_BAND_STEPS - it) / LIQUID_BAND_STEPS }
         }
+        // 花花：淡高光原来铺满键面上半，换行键这种彩色键上半被盖白。改成只沿键边一圈：
+        // 最外缘最亮、往里渐隐，上边亮下边弱；键面中间保持主题原色（与拼音9键一致）。
         val sheen = strength.sheenAlpha(dark)
         hasSheen = sheen > 0f
-        if (hasSheen) sheenPaint.shader = LinearGradient(0f, 0f, 0f, h * .5f, white(sheen), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        if (hasSheen) {
+            val ring = max(strength.bandDp, 3f) * 1.2f * density
+            val step = sheen / LIQUID_BAND_STEPS
+            sheenPaint.shader = LinearGradient(0f, 0f, 0f, h,
+                intArrayOf(white(step), white(step * .55f), white(step * .25f)), null, Shader.TileMode.CLAMP)
+            sheenWidths = FloatArray(LIQUID_BAND_STEPS) { ring * 2f * (LIQUID_BAND_STEPS - it) / LIQUID_BAND_STEPS }
+        }
         heldPaint.color = white(if (dark) .04f else .08f)
     }
 
@@ -119,7 +128,7 @@ class LiquidRim {
         val save = canvas.save()
         canvas.clipPath(path)
         if (held) canvas.drawPath(path, heldPaint)
-        if (hasSheen) canvas.drawPath(path, sheenPaint)
+        if (hasSheen) for (width in sheenWidths) { sheenPaint.strokeWidth = width; canvas.drawPath(path, sheenPaint) }
         if (hasBand) for (width in bandWidths) { bandPaint.strokeWidth = width; canvas.drawPath(path, bandPaint) }
         rimPaint.strokeWidth = if (held) stroke * 1.6f else stroke
         canvas.drawPath(path, rimPaint)
