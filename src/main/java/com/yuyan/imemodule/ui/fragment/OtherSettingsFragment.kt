@@ -24,6 +24,7 @@ import com.yuyan.imemodule.application.CustomConstant
 import com.yuyan.imemodule.application.Launcher
 import com.yuyan.imemodule.manager.UserDataManager
 import com.yuyan.imemodule.prefs.AppPrefs
+import com.yuyan.imemodule.service.EngineLoader
 import com.yuyan.imemodule.ui.activity.LauncherActivity
 import com.yuyan.imemodule.ui.fragment.base.ManagedPreferenceFragment
 import com.yuyan.imemodule.utils.AppUtil
@@ -118,13 +119,12 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
                             if (!tmp.renameTo(target)) {
                                 tmp.copyTo(target, overwrite = true); tmp.delete()
                             }
-                            lifecycleScope.launch(NonCancellable + Dispatchers.Main) {
-                                delay(600L)
-                                AppUtil.exit()
-                            }
                             withContext(Dispatchers.Main) {
-                                AppUtil.showRestartNotification(ctx)
-                                Toast.makeText(ctx, "语法模型已导入，重启后生效", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(ctx, "语法模型已导入，正在加载…", Toast.LENGTH_SHORT).show()
+                                EngineLoader.reloadAsync {
+                                    Toast.makeText(ctx.applicationContext, "语法模型已生效", Toast.LENGTH_SHORT).show()
+                                    if (isAdded) refreshScreen()
+                                }
                             }
                         } catch (e: Exception) {
                             ctx.importErrorDialog(e)
@@ -269,11 +269,13 @@ class OtherSettingsFragment: ManagedPreferenceFragment(AppPrefs.getInstance().ot
             screen.addPreference("删除语法模型", "释放空间，恢复为普通词频排序") {
                 AlertDialog.Builder(ctx)
                     .setTitle("删除语法模型")
-                    .setMessage("删除后需要重启输入法，继续吗？")
+                    .setMessage("确定删除语法模型吗？")
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         gramFile.delete()
-                        AppUtil.showRestartNotification(ctx)
-                        lifecycleScope.launch { delay(400L); AppUtil.exit() }
+                        EngineLoader.reloadAsync {
+                            Toast.makeText(ctx.applicationContext, "语法模型已删除", Toast.LENGTH_SHORT).show()
+                            if (isAdded) refreshScreen()
+                        }
                     }
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()

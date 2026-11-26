@@ -57,8 +57,28 @@ object EngineLoader {
     /** 等引擎加载完成（开机预热广播用，避免进程被提前回收） */
     fun awaitReady(timeoutMs: Long): Boolean = doneLatch.await(timeoutMs, TimeUnit.MILLISECONDS)
 
+    /**
+     * 花花：换了语法模型等文件后，在当前进程里重新加载引擎（不再杀进程，设置页不会闪退）。
+     * 主线程先把 ready 置 false（期间按键排队、不碰引擎），再在后台线程重载；好了回调 [done]。
+     */
+    fun reloadAsync(done: (() -> Unit)? = null) {
+        main.post {
+            ready = false
+            if (done != null) {
+                lateinit var once: () -> Unit
+                once = { readyListeners.remove(once); done() }
+                readyListeners.add(once)
+            }
+            Thread({ loadInBackground() }, "huahua-reload").start()
+        }
+    }
+
     /** 在后台线程调用 */
-    fun loadInBackground() {
+    private val loadLock = Any()
+
+    fun loadInBackground() = synchronized(loadLock) { loadInBackgroundLocked() }
+
+    private fun loadInBackgroundLocked() {
         try {
             RimeEngine.destroy()
             var applied = currentSchemaGuess()
@@ -86,7 +106,7 @@ object EngineLoader {
             pendingKeys.clear()
             keys.forEach { InputDispatcher.inputKeyCode(it) }
         }
-        readyListeners.forEach { runCatching { it() } }
+        ArrayList(readyListeners).forEach { runCatching { it() } }
         doneLatch.countDown()
     }
 

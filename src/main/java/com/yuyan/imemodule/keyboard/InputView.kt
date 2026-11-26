@@ -755,7 +755,7 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
 
         ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
             val env = EnvironmentSingleton.instance
-            env.systemNavbarWindowsBottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            env.systemNavbarWindowsBottom = bottomSafeInset(insets)
             val fullDisplayEnable = appPrefs.internal.fullDisplayKeyboardEnable.getValue()
             mLlKeyboardBottomHolder.minimumHeight = when {
                 env.keyboardModeFloat -> 0
@@ -764,6 +764,22 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
             }
             insets
         }
+    }
+
+    /**
+     * 花花：键盘底部要让出的高度。安卓 11+ 系统会如实报导航栏高度；安卓 10 及以下（如华为 P30/EMUI）
+     * 键盘窗口铺到导航栏下面后，导航栏高度常报 0，底排键就被屏幕下沿和圆角切掉。
+     * 这时退一步用手势区高度，再不行就留系统导航栏高度，至少留 12dp 避开圆角。
+     */
+    private fun bottomSafeInset(insets: WindowInsetsCompat): Int {
+        val nav = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R || nav > 0) return nav
+        val gesture = insets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures()).bottom
+        if (gesture > 0) return gesture
+        val resId = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        val res = if (resId > 0) runCatching { resources.getDimensionPixelSize(resId) }.getOrDefault(0) else 0
+        val minPx = (12 * resources.displayMetrics.density).toInt()
+        return maxOf(minOf(res, (32 * resources.displayMetrics.density).toInt()), minPx)
     }
 
     override fun onStartInputView(editorInfo: EditorInfo, restarting: Boolean) {
