@@ -416,9 +416,15 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         } else if (null != keyIcon) {
             var  intrinsicWidth = keyIcon.intrinsicWidth
             var  intrinsicHeight = keyIcon.intrinsicHeight
-            while(softKey.width() < intrinsicWidth || softKey.height() < intrinsicHeight){
-                intrinsicWidth /= 2
-                intrinsicHeight /= 2
+            // 花花：窄屏（如华为 P30）全键里「中/En」等图标会出框。图标四周约有 15% 留白，
+            // 只在图案放不进按键可见区域时才等比缩小；宽屏手机放得下就不变。
+            val dens = resources.displayMetrics.density
+            val visW = softKey.width() - keyXMargin * 2 - 2f * dens
+            val visH = softKey.height().toFloat()
+            val fit = min(1f, min(visW / (intrinsicWidth * 0.85f), visH / intrinsicHeight))
+            if (fit < 1f) {
+                intrinsicWidth = (intrinsicWidth * fit).toInt()
+                intrinsicHeight = (intrinsicHeight * fit).toInt()
             }
             val marginLeft = (softKey.width() - intrinsicWidth) / 2
             val marginRight = softKey.width() - intrinsicWidth - marginLeft
@@ -435,6 +441,10 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
             mPaint.color = textColor
             if(keyboardFontBold) mPaint.typeface = Typeface.DEFAULT_BOLD
             mPaint.textSize =  mNormalKeyTextSize.toFloat()
+            // 花花：窄键（如 P30 全键的「123」）字放不下时按键宽缩小，放得下不变
+            val labelAvail = softKey.width() - keyXMargin * 2 - 6f * resources.displayMetrics.density
+            val labelW = mPaint.measureText(keyLabel)
+            if (labelAvail > 0 && labelW > labelAvail) mPaint.textSize = mPaint.textSize * labelAvail / labelW
             val x = softKey.mLeft + (softKey.width() - mPaint.measureText(keyLabel)) / 2.0f
             val fontHeight = mFmi.bottom - mFmi.top
             val y = if(keyLabelSmall.isEmpty()) (softKey.mTop + softKey.mBottom) / 2.0f + fontHeight
