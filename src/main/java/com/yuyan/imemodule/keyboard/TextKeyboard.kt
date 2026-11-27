@@ -416,6 +416,10 @@ open class TextKeyboard(context: Context?) : BaseKeyboardView(context){
         } else if (null != keyIcon) {
             var  intrinsicWidth = keyIcon.intrinsicWidth
             var  intrinsicHeight = keyIcon.intrinsicHeight
+            while(softKey.width() < intrinsicWidth || softKey.height() < intrinsicHeight){
+                intrinsicWidth /= 2   // 原有规则：大图标（如 Shift）先减半，保持原来大小
+                intrinsicHeight /= 2
+            }
             // 花花：窄屏（如华为 P30）全键里「中/En」等图标会出框。图标四周约有 15% 留白，
             // 只在图案放不进按键可见区域时才等比缩小；宽屏手机放得下就不变。
             val dens = resources.displayMetrics.density
