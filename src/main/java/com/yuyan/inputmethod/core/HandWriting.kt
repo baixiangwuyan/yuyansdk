@@ -19,6 +19,12 @@ object HandWriting {
         return  result
     }
 
+    /** 花花：释放引擎，下次 init 重新加载（手写数据重解压后用） */
+    fun resetInit() {
+        if (initialized) runCatching { release() }
+        initialized = false
+    }
+
     fun setProperties() {
         reloadConfig()
     }
