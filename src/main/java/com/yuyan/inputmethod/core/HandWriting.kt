@@ -9,7 +9,8 @@ object HandWriting {
         System.loadLibrary("handwriting")
     }
 
-    private var initialized = false
+    var initialized = false
+        private set
 
     fun init(context: Context): Boolean {
         if (this.initialized) return true
@@ -27,7 +28,7 @@ object HandWriting {
     }
 
     @Throws(NumberFormatException::class)
-    fun getCandidatesPyComposition(): Array<Array<String?>?> {
+    fun getCandidatesPyComposition(): Array<Array<String?>?>? {
         return getCandidates()
     }
 
@@ -36,7 +37,7 @@ object HandWriting {
 
     external fun activeMode(mode: Int): Boolean
 
-    external fun getCandidates(): Array<Array<String?>?>
+    external fun getCandidates(): Array<Array<String?>?>?
 
     external fun initWithDirectory(context: Context, str: String?): Boolean
 

@@ -45,6 +45,10 @@ class Launcher {
                 copyFileOrDir(context, "hw", "", CustomConstant.HW_DICT_PATH, true)
                 AppPrefs.getInstance().internal.dataDictVersion.setValue(CustomConstant.CURRENT_RIME_DICT_DATA_VERSIOM)
             }
+            // 花花：手写数据缺失就补复制（导入别的手机的用户数据会带过来版本号，导致没复制过）
+            if (!com.yuyan.inputmethod.HWEngine.dataReady()) {
+                runCatching { copyFileOrDir(context, "hw", "", CustomConstant.HW_DICT_PATH, true) }
+            }
             // 花花：删除已去除的笔画、乱序17词库，释放空间
             listOf("stroke.prism.bin", "stroke.table.bin", "stroke.reverse.bin", "double_pinyin_ls17.prism.bin").forEach {
                 runCatching { java.io.File(CustomConstant.RIME_DICT_PATH, "build/$it").delete() }
