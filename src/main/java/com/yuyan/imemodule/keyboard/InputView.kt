@@ -769,12 +769,12 @@ class InputView(context: Context, private val service: ImeService) : IKeyboardVi
     /**
      * 花花：键盘底部要让出的高度。安卓 11+ 系统会如实报导航栏高度；安卓 10 及以下（如华为 P30/EMUI）
      * 键盘窗口铺到导航栏下面后，导航栏高度常报 0，底排键被屏幕下沿和圆角切掉。
-     * 这时只留 14dp（之前用手势区高度留多了，比系统键盘高一截）。
+     * 这时只留 3dp，底边与华为系统键盘对齐（左右下角键被圆角盖一点可接受）。
      */
     private fun bottomSafeInset(insets: WindowInsetsCompat): Int {
         val nav = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R || nav > 0) return nav
-        return (14 * resources.displayMetrics.density).toInt()
+        return (3 * resources.displayMetrics.density).toInt()
     }
 
     override fun onStartInputView(editorInfo: EditorInfo, restarting: Boolean) {
